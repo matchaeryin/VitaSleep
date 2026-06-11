@@ -3,6 +3,7 @@ package com.vitasleep.android.ui.screens.chat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,6 +20,17 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val userId = VeepooManager.DEFAULT_USER_ID
     var inputText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(userId) {
+        viewModel.loadChatHistory(userId)
+    }
+
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.messages.size - 1)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("健康助手", style = MaterialTheme.typography.headlineMedium, color = OnBackground)
@@ -32,18 +44,45 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
                     Text("你好！我是 VitaSleep 健康助手", color = OnSurface)
                 }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(uiState.messages) { message -> ChatBubble(role = message.role, content = message.content) }
-                    if (uiState.isLoading) item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Primary); Spacer(Modifier.width(8.dp)); Text("思考中…", color = OnSurfaceVariant) } }
+                    if (uiState.isLoading) item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("思考中…", color = OnSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
 
+        if (uiState.error != null && uiState.messages.isEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(uiState.error!!, color = Error, style = MaterialTheme.typography.bodySmall)
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(value = inputText, onValueChange = { inputText = it }, placeholder = { Text("发送消息…") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary))
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                placeholder = { Text("发送消息…") },
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary)
+            )
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendMessage(userId, inputText); inputText = "" } }, enabled = inputText.isNotBlank() && !uiState.isLoading) { Icon(Icons.Default.Send, null, tint = if (inputText.isNotBlank()) Primary else OnSurfaceVariant) }
+            IconButton(
+                onClick = {
+                    if (inputText.isNotBlank()) {
+                        viewModel.sendMessage(userId, inputText)
+                        inputText = ""
+                    }
+                },
+                enabled = inputText.isNotBlank() && !uiState.isLoading
+            ) {
+                Icon(Icons.Default.Send, null, tint = if (inputText.isNotBlank()) Primary else OnSurfaceVariant)
+            }
         }
     }
 }
@@ -53,6 +92,8 @@ fun ChatBubble(role: String, content: String) {
     val isUser = role == "user"
     val bgColor = if (isUser) Primary else SurfaceVariant
     Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start, modifier = Modifier.fillMaxWidth()) {
-        Card(colors = CardDefaults.cardColors(containerColor = bgColor), modifier = Modifier.widthIn(max = 280.dp)) { Text(content, modifier = Modifier.padding(12.dp), color = if (isUser) OnPrimary else OnSurface) }
+        Card(colors = CardDefaults.cardColors(containerColor = bgColor), modifier = Modifier.widthIn(max = 280.dp)) {
+            Text(content, modifier = Modifier.padding(12.dp), color = if (isUser) OnPrimary else OnSurface)
+        }
     }
 }
