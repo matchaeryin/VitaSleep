@@ -1,6 +1,7 @@
 package com.vitasleep.android.ui.screens.device
 
-import android.annotation.SuppressLint
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -9,7 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.ConnectionState
@@ -24,6 +27,8 @@ fun DeviceScreen(
     val connectionState by viewModel.connectionState.collectAsState()
     val scannedDevices by viewModel.scannedDevices.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -96,19 +101,31 @@ fun DeviceScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                onRequestPermissions()
-                                viewModel.startScan()
+                                val hasPermission = checkBlePermissions(context)
+                                if (hasPermission) {
+                                    viewModel.startScan()
+                                } else {
+                                    onRequestPermissions()
+                                }
                             },
+                            enabled = !isScanning,
                             colors = ButtonDefaults.buttonColors(containerColor = Primary)
                         ) {
                             Icon(Icons.Default.Search, null)
                             Spacer(Modifier.width(4.dp))
-                            Text("扫描设备")
+                            Text(if (isScanning) "扫描中..." else "扫描设备")
+                        }
+                        if (isScanning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Primary,
+                                strokeWidth = 2.dp
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (scannedDevices.isEmpty()) {
+                    if (isScanning && scannedDevices.isEmpty()) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
                             modifier = Modifier.fillMaxWidth()
@@ -117,17 +134,59 @@ fun DeviceScreen(
                                 modifier = Modifier.padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("点击扫描按钮搜索附近的 Veepoo 设备", color = OnSurfaceVariant)
+                                CircularProgressIndicator(color = Primary, modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.height(12.dp))
+                                Text("正在扫描附近的蓝牙设备...", color = OnSurfaceVariant)
+                            }
+                        }
+                    } else if (!isScanning && scannedDevices.isEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("点击扫描按钮搜索附近的蓝牙设备", color = OnSurfaceVariant)
                             }
                         }
                     }
 
+                    if (!isScanning && scannedDevices.isNotEmpty()) {
+                        Text(
+                            "发现 ${scannedDevices.size} 个设备",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+
                     scannedDevices.forEach { device ->
                         DeviceItem(device, onClick = { viewModel.connect(device) })
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
             }
             is ConnectionState.Connected -> {
+                val mac = (connectionState as ConnectionState.Connected).mac
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Surface),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.BluetoothConnected, null, tint = Success, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("已连接设备", color = OnSurface)
+                            Text(mac, style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { viewModel.readAllOriginData() },
@@ -166,8 +225,34 @@ fun DeviceScreen(
             }
             is ConnectionState.Error -> {
                 Text("连接错误: ${(connectionState as ConnectionState.Error).message}", color = Error)
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.startScan() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Text("重新扫描")
+                }
             }
         }
+    }
+}
+
+private fun checkBlePermissions(context: android.content.Context): Boolean {
+    val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    } else {
+        arrayOf(
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    }
+    return permissions.all {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 }
 
