@@ -29,8 +29,45 @@ class SleepViewModel @Inject constructor(private val repository: HealthRepositor
     fun loadSleepData(userId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            // 实际调用 API 获取睡眠数据
-            _uiState.value = _uiState.value.copy(isLoading = false, totalSleepHours = "7.5", deepPct = 20f, lightPct = 50f, remPct = 15f, awakePct = 15f, qualityScore = 85f)
+            repository.getSleepData(userId).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        val sleepMetrics = result.data
+                        if (sleepMetrics.isEmpty()) {
+                            _uiState.value = _uiState.value.copy(isLoading = false, error = "暂无睡眠数据")
+                        } else {
+                            val latestSleep = sleepMetrics.first()
+                            val value = latestSleep.value
+                            if (value is Map<*, *>) {
+                                @Suppress("UNCHECKED_CAST")
+                                val map = value as Map<String, Any>
+                                val sleepHours = (map["sleep_hours"] as? Number)?.toFloat()
+                                val deepPct = (map["deep_pct"] as? Number)?.toFloat() ?: 0f
+                                val lightPct = (map["light_pct"] as? Number)?.toFloat() ?: 0f
+                                val remPct = (map["rem_pct"] as? Number)?.toFloat() ?: 0f
+                                val awakePct = (map["awake_pct"] as? Number)?.toFloat() ?: 0f
+                                val qualityScore = (map["quality_score"] as? Number)?.toFloat()
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    totalSleepHours = sleepHours?.let { String.format("%.1f", it) },
+                                    deepPct = deepPct,
+                                    lightPct = lightPct,
+                                    remPct = remPct,
+                                    awakePct = awakePct,
+                                    qualityScore = qualityScore,
+                                    error = null
+                                )
+                            } else {
+                                _uiState.value = _uiState.value.copy(isLoading = false, error = "睡眠数据格式错误")
+                            }
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                    }
+                    ApiResult.Loading -> {}
+                }
+            }
         }
     }
 }
