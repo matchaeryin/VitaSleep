@@ -1,5 +1,6 @@
 package com.vitasleep.android.ui.screens.device
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vitasleep.android.data.repository.ApiResult
@@ -8,14 +9,19 @@ import com.vitasleep.android.veepoo.ConnectionState
 import com.vitasleep.android.veepoo.ScannedDevice
 import com.vitasleep.android.veepoo.VeepooManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class DeviceViewModel @Inject constructor(private val veepooRepository: VeepooRepository) : ViewModel() {
+class DeviceViewModel @Inject constructor(
+    @ApplicationContext context: Context,
+    private val veepooRepository: VeepooRepository
+) : ViewModel() {
 
-    private val veepooManager = VeepooManager.getInstance(androidx.compose.ui.platform.LocalContext.current)
+    private val veepooManager = VeepooManager.getInstance(context)
+
     val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
@@ -37,7 +43,6 @@ class DeviceViewModel @Inject constructor(private val veepooRepository: VeepooRe
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         viewModelScope.launch {
             _syncState.value = SyncState.Uploading
-            // 实际上传逻辑
             _syncState.value = SyncState.Success("上传完成")
         }
     }

@@ -21,4 +21,5 @@
     <color name="battery_high">#22C55E</color>
     <color name="battery_medium">#F59E0B</color>
     <color name="battery_low">#EF4444</color>
+    <color name="ic_launcher_background">#4F46E5</color>
 </resources>
