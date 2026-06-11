@@ -19,20 +19,27 @@ interface VitaSleepApi {
     @GET("api/health/sleep")
     suspend fun getSleep(@Query("user_id") userId: String, @Query("days") days: Int = 7): Response<List<HealthMetric>>
 
-    @GET("api/schedule/list")
-    suspend fun getSchedules(@Query("user_id") userId: String): Response<List<Schedule>>
+    @GET("api/schedules")
+    suspend fun getSchedules(
+        @Query("user_id") userId: String,
+        @Query("start_time") startTime: String? = null,
+        @Query("end_time") endTime: String? = null
+    ): Response<List<Schedule>>
 
-    @POST("api/schedule/create")
+    @POST("api/schedules")
     suspend fun createSchedule(@Body request: CreateScheduleRequest): Response<Schedule>
 
-    @DELETE("api/schedule/{id}")
+    @DELETE("api/schedules/{id}")
     suspend fun deleteSchedule(@Path("id") id: Int): Response<Unit>
 
     @POST("api/chat/send")
     suspend fun sendMessage(@Body request: SendMessageRequest): Response<ChatMessage>
 
     @GET("api/chat/history")
-    suspend fun getChatHistory(@Query("user_id") userId: String): Response<List<ChatMessage>>
+    suspend fun getChatHistory(
+        @Query("user_id") userId: String,
+        @Query("limit") limit: Int = 50
+    ): Response<List<ChatMessage>>
 
     @POST("api/data/veepoo/origin5min")
     suspend fun uploadVeepooOrigin5min(@Body request: VeepooOriginDataRequest): Response<VeepooUploadResponse>

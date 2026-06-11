@@ -277,7 +277,7 @@ class VeepooManager private constructor(
     }
 
     companion object {
-        const val DEFAULT_USER_ID = "user_001"
+        const val DEFAULT_USER_ID = "test_user_001"
         const val VEEPOO_SERVICE_UUID = "0000fee7-0000-1000-8000-00805f9b34fb"
         const val BATTERY_SERVICE_UUID = "0000180f-0000-1000-8000-00805f9b34fb"
         const val BATTERY_LEVEL_CHAR_UUID = "00002a19-0000-1000-8000-00805f9b34fb"

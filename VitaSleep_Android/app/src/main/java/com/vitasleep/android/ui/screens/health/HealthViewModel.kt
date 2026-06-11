@@ -112,63 +112,15 @@ class HealthViewModel @Inject constructor(
         }
     }
 
+    private fun toInt(value: Any?): Int? {
+        return when (value) {
+            is Number -> value.toInt()
+            is String -> value.toDoubleOrNull()?.toInt()
+            else -> null
+        }
+    }
+
     private fun parseBattery(value: Any?): Int? {
         return try {
             if (value is Number) value.toInt()
-            else if (value is Map<*, *>) (value as Map<*, *>)["level"]?.toString()?.toIntOrNull()
-            else null
-        } catch (e: Exception) { null }
-    }
-
-    private fun parseHeartRate(value: Any?): Int? {
-        return try {
-            if (value is Number) value.toInt()
-            else if (value is Map<*, *>) (value as Map<*, *>)["bpm"]?.toString()?.toIntOrNull()
-            else null
-        } catch (e: Exception) { null }
-    }
-
-    private fun parseBloodPressure(value: Any?): String? {
-        return try {
-            if (value is Map<*, *>) {
-                val sys = (value as Map<*, *>)["systolic"]?.toString() ?: return null
-                val dia = value["diastolic"]?.toString() ?: return null
-                "$sys/$dia"
-            } else null
-        } catch (e: Exception) { null }
-    }
-
-    private fun parseCardioIndex(value: Any?): String? {
-        return try {
-            if (value is Map<*, *>) {
-                (value as Map<*, *>)["score"]?.toString()?.let { "${it}/100" }
-            } else null
-        } catch (e: Exception) { null }
-    }
-
-    private fun parseCardioRisk(value: Any?): String? {
-        return try {
-            if (value is Map<*, *>) {
-                when ((value as Map<*, *>)["risk_level"]?.toString()) {
-                    "low" -> "低风险"
-                    "moderate" -> "中风险"
-                    "high" -> "高风险"
-                    else -> null
-                }
-            } else null
-        } catch (e: Exception) { null }
-    }
-
-    private fun parseHrv(value: Any?): String? {
-        return try {
-            if (value is Map<*, *>) {
-                (value as Map<*, *>)["rmssd"]?.toString()?.let { "${it} ms" }
-            } else null
-        } catch (e: Exception) { null }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopSseListening()
-    }
-}
+            else if (value is Map<*, *>) toInt((value as Map<*, *>)[
