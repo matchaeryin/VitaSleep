@@ -5,10 +5,14 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./VitaSleep_Android
 
     steps:
       - name: Checkout
@@ -23,11 +27,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.5
+          gradle-version: 8.7
 
-      - name: Build Debug APK
-        working-directory: ./VitaSleep_Android
-        run: gradle assembleDebug
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
