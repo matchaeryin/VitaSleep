@@ -76,7 +76,7 @@ veepooRouter.post('/sleep', (req, res) => {
 
     const result = db.prepare(
       'INSERT INTO health_metrics (user_id, metric_type, value, computed_at, valid_until, source) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(userId, 'sleep', JSON.stringify(value), now, now, 'veepoo');
+    ).run(userId, 'sleep_stage', JSON.stringify(value), now, now, 'veepoo');
 
     res.json({
       status: 'ok',
