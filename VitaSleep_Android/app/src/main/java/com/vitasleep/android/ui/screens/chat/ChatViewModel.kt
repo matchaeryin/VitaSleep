@@ -22,6 +22,22 @@ class ChatViewModel @Inject constructor(private val repository: ChatRepository) 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
 
+    fun loadChatHistory(userId: String) {
+        viewModelScope.launch {
+            repository.getChatHistory(userId).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(messages = result.data, error = null)
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(error = result.message)
+                    }
+                    ApiResult.Loading -> {}
+                }
+            }
+        }
+    }
+
     fun sendMessage(userId: String, content: String) {
         val userMsg = ChatMessage(userId = userId, role = "user", content = content)
         _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + userMsg, isLoading = true)
