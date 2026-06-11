@@ -1,6 +1,6 @@
 /**
- * 指标路由 - 对接已有算法服务
- * 支持模拟数据模式（无需 Google Health Token）
+ * 指标路由 - 健康数据处理
+ * 数据源：模拟或真实数据（暂时用Google Health Token）
  */
 
 import { Router } from 'express';
@@ -10,7 +10,7 @@ import { AlgorithmClient, MetricPayload } from '../services/algorithmClient.js';
 export const metricsRouter = Router();
 const algorithmClient = new AlgorithmClient(process.env.ALGORITHM_URL || 'http://localhost:8001');
 
-// 模拟数据：模拟 Google Health API 返回的典型数据
+// 生成模拟指标——返回Google Health API格式的字段
 function generateMockMetrics(): { metrics: MetricPayload; hoursSinceLastSleep: number } {
   const rand = (min: number, max: number) => Math.round((Math.random() * (max - min) + min) * 10) / 10;
 
@@ -34,7 +34,7 @@ function generateMockMetrics(): { metrics: MetricPayload; hoursSinceLastSleep: n
   };
 }
 
-// POST /api/metrics/update/:userId — 触发指标计算
+// POST /api/metrics/update/:userId — 触发健康数据更新
 metricsRouter.post('/update/:userId', async (req, res) => {
   const { userId } = req.params;
   const { googleAccessToken, useMock } = req.body;
@@ -43,23 +43,23 @@ metricsRouter.post('/update/:userId', async (req, res) => {
     let metrics: MetricPayload;
     let hoursSinceLastSleep: number | null;
 
-    // 如果没有 Google Token 或显式要求使用模拟数据，则用模拟数据
+    // 优先使用Google Token，否则使用模拟指标
     if (!googleAccessToken || useMock) {
-      console.log(`[Metrics] 使用模拟数据 (userId=${userId})`);
+      console.log(`[Metrics] 使用模拟指标 (userId=${userId})`);
       const mock = generateMockMetrics();
       metrics = mock.metrics;
       hoursSinceLastSleep = mock.hoursSinceLastSleep;
     } else {
-      // 真实模式：需要 Google Health Token
+      // 真实数据：需要Google Health Token
       return res.status(501).json({
         success: false,
-        error: 'Google Health API 集成待实现，请使用 useMock: true',
+        error: 'Google Health API 尚未接入，请先使用 useMock: true',
       });
     }
 
-    console.log(`[Metrics] 输入数据:`, JSON.stringify({ hoursSinceLastSleep, metrics }, null, 2));
+    console.log(`[Metrics] 生成指标:`, JSON.stringify({ hoursSinceLastSleep, metrics }, null, 2));
 
-    // 并行调用 4 个算法接口
+    // 并发调用4个指标计算
     const [battery, fatigue, sleep, cardio] = await Promise.all([
       algorithmClient.calculateBattery({
         user_id: userId,
@@ -75,9 +75,9 @@ metricsRouter.post('/update/:userId', async (req, res) => {
       algorithmClient.calculateCardio(userId, metrics),
     ]);
 
-    console.log(`[Metrics] 算法结果: battery=${battery.battery}, fatigue=${fatigue.fatigue_index}, sleep=${sleep.sleep_score}, cardio=${cardio.cardio_index}`);
+    console.log(`[Metrics] 计算完成: battery=${battery.battery}, fatigue=${fatigue.fatigue_index}, sleep=${sleep.sleep_score}, cardio=${cardio.cardio_index}`);
 
-    // 存储结果到数据库
+    // 存储所有结果
     const runId = storeResults(userId, { battery, fatigue, sleep, cardio });
 
     res.json({
@@ -94,7 +94,7 @@ metricsRouter.post('/update/:userId', async (req, res) => {
   } catch (error: any) {
     console.error('[Metrics] 更新失败:', error.message);
     if (error.response) {
-      console.error('[Metrics] 算法服务响应:', error.response.status, error.response.data);
+      console.error('[Metrics] 指标服务状态:', error.response.status, error.response.data);
     }
     res.status(500).json({ success: false, error: error.message });
   }
@@ -108,10 +108,10 @@ metricsRouter.get('/:userId', (req, res) => {
     .get(userId) as any;
 
   if (!latest) {
-    return res.json({ success: true, data: null, message: '暂无数据，请先调用 POST /api/metrics/update/:userId 触发计算' });
+    return res.json({ success: true, data: null, message: '暂无数据，请先使用 POST /api/metrics/update/:userId 触发更新' });
   }
 
-  // 获取关联的指标详情
+  // 获取最新的指标详情
   const metricDetails = db
     .prepare('SELECT * FROM health_metrics WHERE user_id = ? AND algorithm_run_id = ? ORDER BY metric_type')
     .all(userId, latest.id) as any[];
@@ -137,7 +137,7 @@ metricsRouter.get('/:userId', (req, res) => {
   });
 });
 
-// GET /api/metrics/:userId/history — 获取历史记录
+// GET /api/metrics/:userId/history — 历史记录
 metricsRouter.get('/:userId/history', (req, res) => {
   const { userId } = req.params;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -160,7 +160,7 @@ metricsRouter.get('/:userId/history', (req, res) => {
   });
 });
 
-// 存储结果到数据库
+// 存储所有结果
 function storeResults(userId: string, results: any): number {
   const now = new Date().toISOString();
 
@@ -195,13 +195,13 @@ function storeResults(userId: string, results: any): number {
     insertMetric.run(userId, 'fatigue', JSON.stringify(results.fatigue), now, validUntil, runId);
   }
   if (results.sleep) {
-    insertMetric.run(userId, 'sleep', JSON.stringify(results.sleep), now, validUntil, runId);
+    insertMetric.run(userId, 'sleep_stage', JSON.stringify(results.sleep), now, validUntil, runId);
   }
   if (results.cardio) {
     insertMetric.run(userId, 'cardio', JSON.stringify(results.cardio), now, validUntil, runId);
   }
 
-  console.log(`[Metrics] 已存储到数据库 (runId=${runId})`);
+  console.log(`[Metrics] 已存储所有结果 (runId=${runId})`);
   return runId;
 }
 

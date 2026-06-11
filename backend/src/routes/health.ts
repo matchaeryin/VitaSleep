@@ -61,10 +61,11 @@ healthRouter.get('/battery', (req, res) => {
 
 healthRouter.get('/sleep', (req, res) => {
   const userId = (req.query.user_id as string) || 'test_user_001';
+  const days = parseInt(req.query.days as string) || 7;
   try {
     const rows = db.prepare(
-      "SELECT * FROM health_metrics WHERE user_id = ? AND metric_type = 'sleep' ORDER BY computed_at DESC LIMIT 30"
-    ).all(userId) as any[];
+      "SELECT * FROM health_metrics WHERE user_id = ? AND metric_type = 'sleep_stage' AND computed_at >= datetime('now', '-' || ? || ' days') ORDER BY computed_at DESC LIMIT 100"
+    ).all(userId, days) as any[];
 
     const result = rows.map(row => ({
       id: row.id,
