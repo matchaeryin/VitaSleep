@@ -1,12 +1,11 @@
 package com.vitasleep.android.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 import com.vitasleep.android.BuildConfig
 import com.vitasleep.android.data.api.VitaSleepApi
-import com.vitasleep.android.data.repository.HealthRepository
-import com.vitasleep.android.data.repository.ScheduleRepository
-import com.vitasleep.android.data.repository.ChatRepository
-import com.vitasleep.android.data.repository.VeepooRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,16 +18,29 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "vitasleep_prefs")
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
     @Provides
     @Singleton
+    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return context.dataStore
+    }
+
+    @Provides
+    @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
+
         return OkHttpClient.Builder()
             .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -52,20 +64,4 @@ object AppModule {
     fun provideVitaSleepApi(retrofit: Retrofit): VitaSleepApi {
         return retrofit.create(VitaSleepApi::class.java)
     }
-
-    @Provides
-    @Singleton
-    fun provideHealthRepository(api: VitaSleepApi): HealthRepository = HealthRepository(api)
-
-    @Provides
-    @Singleton
-    fun provideScheduleRepository(api: VitaSleepApi): ScheduleRepository = ScheduleRepository(api)
-
-    @Provides
-    @Singleton
-    fun provideChatRepository(api: VitaSleepApi): ChatRepository = ChatRepository(api)
-
-    @Provides
-    @Singleton
-    fun provideVeepooRepository(api: VitaSleepApi): VeepooRepository = VeepooRepository(api)
 }
