@@ -50,14 +50,20 @@ class HealthViewModel @Inject constructor(
                 when (result) {
                     is ApiResult.Success -> {
                         val metrics = result.data
+                        val parsedBattery = parseBattery(metrics["battery"]?.value)
+                        val parsedHeartRate = parseHeartRate(metrics["heart_rate"]?.value)
+                        val parsedBloodPressure = parseBloodPressure(metrics["blood_pressure"]?.value)
+                        val parsedCardioIndex = parseCardioIndex(metrics["cardio_index"]?.value)
+                        val parsedCardioRisk = parseCardioRisk(metrics["cardio_index"]?.value)
+                        val parsedHrv = parseHrv(metrics["hrv"]?.value)
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            battery = parseBattery(metrics["battery"]?.value),
-                            heartRate = parseHeartRate(metrics["heart_rate"]?.value),
-                            bloodPressure = parseBloodPressure(metrics["blood_pressure"]?.value),
-                            cardioIndex = parseCardioIndex(metrics["cardio_index"]?.value),
-                            cardioRisk = parseCardioRisk(metrics["cardio_index"]?.value),
-                            hrv = parseHrv(metrics["hrv"]?.value),
+                            battery = parsedBattery,
+                            heartRate = parsedHeartRate,
+                            bloodPressure = parsedBloodPressure,
+                            cardioIndex = parsedCardioIndex,
+                            cardioRisk = parsedCardioRisk,
+                            hrv = parsedHrv,
                             recentMetrics = metrics.values.toList(),
                             lastUpdateTime = System.currentTimeMillis(),
                             error = null
@@ -151,7 +157,10 @@ class HealthViewModel @Inject constructor(
     private fun parseCardioIndex(value: Any?): String? = try {
         if (value is Map<*, *>) {
             val map = value as Map<String, Any>
-            val index = toDouble(map["index"]) ?: toDouble(map["cardio_index"]) ?: toDouble(map["value"])
+            val index = toDouble(map["score"])
+                ?: toDouble(map["index"])
+                ?: toDouble(map["cardio_index"])
+                ?: toDouble(map["value"])
             index?.let { String.format("%.1f", it) }
         } else if (value is Number) String.format("%.1f", value.toDouble())
         else null
@@ -161,8 +170,15 @@ class HealthViewModel @Inject constructor(
     private fun parseCardioRisk(value: Any?): String? = try {
         if (value is Map<*, *>) {
             val map = value as Map<String, Any>
-            val risk = toDouble(map["risk"]) ?: toDouble(map["cardio_risk"])
-            risk?.let { String.format("%.1f", it) }
+            val riskLevel = map["risk_level"] as? String
+            when (riskLevel) {
+                "low" -> "\u4f4e\u98ce\u9669"
+                "medium", "moderate" -> "\u4e2d\u98ce\u9669"
+                "high" -> "\u9ad8\u98ce\u9669"
+                null -> toDouble(map["risk"])?.let { String.format("%.1f", it) }
+                    ?: toDouble(map["cardio_risk"])?.let { String.format("%.1f", it) }
+                else -> riskLevel
+            }
         } else null
     } catch (e: Exception) { null }
 
