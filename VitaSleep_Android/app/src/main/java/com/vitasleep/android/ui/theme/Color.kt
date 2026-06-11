@@ -1,0 +1,30 @@
+package com.vitasleep.android.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val Primary = Color(0xFF6366F1)
+val PrimaryVariant = Color(0xFF4F46E5)
+val Secondary = Color(0xFF10B981)
+val SecondaryVariant = Color(0xFF059669)
+
+val Background = Color(0xFF0F172A)
+val Surface = Color(0xFF1E293B)
+val SurfaceVariant = Color(0xFF334155)
+
+val OnPrimary = Color.White
+val OnBackground = Color(0xFFF8FAFC)
+val OnSurface = Color(0xFFF1F5F9)
+val OnSurfaceVariant = Color(0xFF94A3B8)
+
+val Success = Color(0xFF22C55E)
+val Warning = Color(0xFFF59E0B)
+val Error = Color(0xFFEF4444)
+
+val DeepSleepColor = Color(0xFF3B82F6)
+val LightSleepColor = Color(0xFF60A5FA)
+val RemSleepColor = Color(0xFFA78BFA)
+val AwakeColor = Color(0xFFFCD34D)
+
+val BatteryHigh = Color(0xFF22C55E)
+val BatteryMedium = Color(0xFFF59E0B)
+val BatteryLow = Color(0xFFEF4444)
