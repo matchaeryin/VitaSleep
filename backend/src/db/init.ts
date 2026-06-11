@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -7,11 +7,11 @@ const __dirname = path.dirname(__filename);
 
 const DB_PATH = path.join(__dirname, '../../data/vitasleep.db');
 
-export function initDatabase() {
+export function initDatabase(): DatabaseType {
   const db = new Database(DB_PATH);
   db.pragma('foreign_keys = ON');
   
-  // 健康指标表
+  // ?????
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_metrics (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +25,7 @@ export function initDatabase() {
     )
   `);
   
-  // 日程表
+  // ???
   db.exec(`
     CREATE TABLE IF NOT EXISTS schedules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +41,7 @@ export function initDatabase() {
     )
   `);
   
-  // 算法运行记录表（V2 新增）
+  // ???????(V2 ??)
   db.exec(`
     CREATE TABLE IF NOT EXISTS algorithm_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +55,7 @@ export function initDatabase() {
     )
   `);
   
-  // 对话历史表
+  // ?????
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +67,7 @@ export function initDatabase() {
     )
   `);
   
-  // 索引
+  // ??
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_health_metrics_user ON health_metrics(user_id, metric_type, computed_at);
     CREATE INDEX IF NOT EXISTS idx_schedules_user ON schedules(user_id, start_time);
@@ -75,8 +75,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id, created_at);
   `);
   
-  console.log('✅ Database initialized');
+  console.log('? Database initialized');
   return db;
 }
 
-export const db = initDatabase();
+export const db: DatabaseType = initDatabase();

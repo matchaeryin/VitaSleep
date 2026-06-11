@@ -1,6 +1,6 @@
 /**
- * 数据聚合服务
- * 将 Google Health 数据转换为算法服务需要的 MetricPayload 格式
+ * ??????
+ * ? Google Health ???????????? MetricPayload ??
  */
 
 import GoogleHealthClient, { HeartRateData, SleepData, StepsData } from './googleHealthClient.js';
@@ -74,7 +74,7 @@ export class DataAggregator {
 
   private calculateHoursSinceLastSleep(data: SleepData | null): number | null {
     if (!data || !data.dataPoints.length) return null;
-    const endTimes = data.dataPoints.map(p => p.endTime || p.timestamp).filter(t => t);
+    const endTimes = data.dataPoints.map((p: any) => p.endTime || p.timestamp).filter((t: any) => t);
     if (!endTimes.length) return null;
     const lastSleepEnd = Math.max(...endTimes);
     return Math.min((Date.now() - lastSleepEnd) / (1000 * 60 * 60), 24);
