@@ -158,20 +158,24 @@ class VeepooManager private constructor(
             }
         }
 
+        @Deprecated("Deprecated in Java")
         override fun onCharacteristicChanged(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic
         ) {
+            @Suppress("DEPRECATION")
             val data = characteristic.value
             println("[VeepooManager] data received: ${data.joinToString(", ") { "0x%02X".format(it) }}")
         }
 
+        @Deprecated("Deprecated in Java")
         override fun onCharacteristicRead(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                @Suppress("DEPRECATION")
                 val data = characteristic.value
                 println("[VeepooManager] data read: ${data.contentToString()}")
             }
