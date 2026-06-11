@@ -38,23 +38,28 @@ class VeepooManager private constructor(
     private val _deviceBattery = MutableStateFlow<Int?>(null)
     private val _latestOriginData = MutableStateFlow<List<Map<String, Any>>>(emptyList())
     private val _latestSleepData = MutableStateFlow<Map<String, Any>?>(null)
+    private val _isScanning = MutableStateFlow(false)
 
     val connectionState: StateFlow<ConnectionState> = _connectionState
     val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices
     val deviceBattery: StateFlow<Int?> = _deviceBattery
     val latestOriginData: StateFlow<List<Map<String, Any>>> = _latestOriginData
     val latestSleepData: StateFlow<Map<String, Any>?> = _latestSleepData
+    val scanning: StateFlow<Boolean> = _isScanning
 
     fun hasBluetooth(): Boolean = bluetoothAdapter?.isEnabled == true
 
+    fun hasBluetoothHardware(): Boolean = bluetoothAdapter != null
+
     fun initialize() {
-        println("[VeepooManager] 初始化完成, BLE可用: ${bluetoothAdapter?.isEnabled}")
+        println("[VeepooManager] initialized, BLE available: ${bluetoothAdapter?.isEnabled}")
     }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
-            val name = device.name ?: "Unknown"
+            val name = device.name ?: return
+            if (name.isBlank()) return
             val mac = device.address
             val rssi = result.rssi
 
@@ -71,14 +76,15 @@ class VeepooManager private constructor(
         }
 
         override fun onScanFailed(errorCode: Int) {
-            println("[VeepooManager] 扫描失败: errorCode=$errorCode")
+            println("[VeepooManager] scan failed: errorCode=$errorCode")
             isScanning = false
+            _isScanning.value = false
         }
     }
 
     fun startScan() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
-            println("[VeepooManager] 蓝牙未开启")
+            println("[VeepooManager] bluetooth not enabled")
             return
         }
         if (isScanning) {
@@ -87,30 +93,26 @@ class VeepooManager private constructor(
 
         _scannedDevices.value = emptyList()
         isScanning = true
+        _isScanning.value = true
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
-        val filters = listOf(
-            ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(UUID.fromString(VEEPOO_SERVICE_UUID)))
-                .build()
-        )
-
         try {
-            bleScanner?.startScan(filters, settings, scanCallback)
-            println("[VeepooManager] 开始 BLE 扫描（过滤Veepoo设备）")
+            bleScanner?.startScan(null, settings, scanCallback)
+            println("[VeepooManager] started BLE scan (no UUID filter, scanning all devices)")
 
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (isScanning) {
                     stopScan()
-                    println("[VeepooManager] 扫描超时，自动停止（10秒）")
+                    println("[VeepooManager] scan timeout, auto-stopped (10s)")
                 }
             }, 10000)
         } catch (e: SecurityException) {
-            println("[VeepooManager] 扫描权限被拒绝: ${e.message}")
+            println("[VeepooManager] scan permission denied: ${e.message}")
             isScanning = false
+            _isScanning.value = false
         }
     }
 
@@ -119,10 +121,11 @@ class VeepooManager private constructor(
             try {
                 bleScanner?.stopScan(scanCallback)
             } catch (e: SecurityException) {
-                println("[VeepooManager] 停止扫描异常: ${e.message}")
+                println("[VeepooManager] stop scan error: ${e.message}")
             }
             isScanning = false
-            println("[VeepooManager] 停止扫描，发现 ${_scannedDevices.value.size} 个设备")
+            _isScanning.value = false
+            println("[VeepooManager] stopped scan, found ${_scannedDevices.value.size} devices")
         }
     }
 
@@ -130,13 +133,13 @@ class VeepooManager private constructor(
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
-                    println("[VeepooManager] GATT 已连接")
+                    println("[VeepooManager] GATT connected")
                     gatt.discoverServices()
                     val mac = gatt.device.address
                     _connectionState.value = ConnectionState.Connected(mac)
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    println("[VeepooManager] GATT 已断开")
+                    println("[VeepooManager] GATT disconnected")
                     _connectionState.value = ConnectionState.Disconnected
                     gatt.close()
                 }
@@ -145,7 +148,7 @@ class VeepooManager private constructor(
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                println("[VeepooManager] 发现 ${gatt.services.size} 个GATT服务")
+                println("[VeepooManager] discovered ${gatt.services.size} GATT services")
                 gatt.services.forEach { service ->
                     println("[VeepooManager] Service: ${service.uuid}")
                     service.characteristics.forEach { char ->
@@ -160,7 +163,7 @@ class VeepooManager private constructor(
             characteristic: BluetoothGattCharacteristic
         ) {
             val data = characteristic.value
-            println("[VeepooManager] 收到数据: ${data.joinToString(", ") { "0x%02X".format(it) }}")
+            println("[VeepooManager] data received: ${data.joinToString(", ") { "0x%02X".format(it) }}")
         }
 
         override fun onCharacteristicRead(
@@ -170,7 +173,7 @@ class VeepooManager private constructor(
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 val data = characteristic.value
-                println("[VeepooManager] 读取数据: ${data.contentToString()}")
+                println("[VeepooManager] data read: ${data.contentToString()}")
             }
         }
     }
@@ -184,13 +187,13 @@ class VeepooManager private constructor(
         try {
             val device = bluetoothAdapter.getRemoteDevice(mac)
             bluetoothGatt = device.connectGatt(context, false, gattCallback)
-            println("[VeepooManager] 正在连接: $mac")
+            println("[VeepooManager] connecting to: $mac")
         } catch (e: SecurityException) {
-            println("[VeepooManager] 连接权限被拒绝: ${e.message}")
-            _connectionState.value = ConnectionState.Error("连接权限被拒绝")
+            println("[VeepooManager] connect permission denied: ${e.message}")
+            _connectionState.value = ConnectionState.Error("connect permission denied")
         } catch (e: Exception) {
-            println("[VeepooManager] 连接失败: ${e.message}")
-            _connectionState.value = ConnectionState.Error(e.message ?: "连接失败")
+            println("[VeepooManager] connect failed: ${e.message}")
+            _connectionState.value = ConnectionState.Error(e.message ?: "connect failed")
         }
     }
 
@@ -200,11 +203,11 @@ class VeepooManager private constructor(
             bluetoothGatt?.close()
             bluetoothGatt = null
         } catch (e: SecurityException) {
-            println("[VeepooManager] 断开权限被拒绝: ${e.message}")
+            println("[VeepooManager] disconnect permission denied: ${e.message}")
         }
         _connectionState.value = ConnectionState.Disconnected
         _deviceBattery.value = null
-        println("[VeepooManager] 已断开连接")
+        println("[VeepooManager] disconnected")
     }
 
     fun readBattery() {
@@ -223,19 +226,19 @@ class VeepooManager private constructor(
                     }
                 }
             } catch (e: SecurityException) {
-                println("[VeepooManager] 读取权限被拒绝")
+                println("[VeepooManager] read permission denied")
             }
         }
         _deviceBattery.value = 85
     }
 
     fun readAllOriginData() {
-        println("[VeepooManager] 读取所有原始数据（待Veepoo SDK集成）")
+        println("[VeepooManager] reading origin data (pending Veepoo SDK integration)")
         _latestOriginData.value = emptyList()
     }
 
     fun readSleepData() {
-        println("[VeepooManager] 读取睡眠数据（待Veepoo SDK集成）")
+        println("[VeepooManager] reading sleep data (pending Veepoo SDK integration)")
         _latestSleepData.value = null
     }
 
