@@ -1,50 +1,60 @@
-# Node modules
+# ================== Python / 后端 ==================
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.env
+.venv
+venv/
+*.log
+*.db
+*.sqlite
+vitasleep.db
+vitasleep.db.bak
+backend.log
+app/agent.log
+agent/agent.log
+
+# ================== Node.js / 前端 ==================
 node_modules/
+dist/
+build/
+.DS_Store
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.vite
+frontend.log
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv
-*.egg-info/
-dist/
-build/
-
-# IDE
+# ================== Android / App ==================
+*.iml
+.gradle/
 .idea/
+local.properties
+build/
+app/build/
+captures/
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.idsig
+
+# ================== Veepoo SDK 二进制 ==================
+*.jar
+*.aar
+
+# ================== 编辑器/IDE ==================
 .vscode/
+.idea/
 *.swp
 *.swo
-*~
 
-# OS
-.DS_Store
+# ================== 系统文件 ==================
 Thumbs.db
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-data/
-
-# Logs
-logs/
-*.log
-
-# Build output
-dist/
-build/
-*.tsbuildinfo
+.DS_Store
