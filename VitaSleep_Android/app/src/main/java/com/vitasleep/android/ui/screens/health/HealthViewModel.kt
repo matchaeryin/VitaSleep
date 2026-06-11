@@ -82,14 +82,9 @@ class HealthViewModel @Inject constructor(
         viewModelScope.launch {
             sseClient.events.collect { event ->
                 when (event) {
-                    is SseHealthEvent.NewMetric -> {
-                        println("[HealthVM] 收到新指标推送: ${event.type}, count=${event.count}")
-                        refreshLatestMetrics()
-                    }
+                    is SseHealthEvent.NewMetric -> refreshLatestMetrics()
                     is SseHealthEvent.Heartbeat -> {}
-                    is SseHealthEvent.Error -> {
-                        println("[HealthVM] SSE 错误: ${event.message}")
-                    }
+                    is SseHealthEvent.Error -> {}
                     is SseHealthEvent.Message -> {}
                 }
             }
@@ -97,13 +92,11 @@ class HealthViewModel @Inject constructor(
 
         sseClient.connect(userId, baseUrl)
         _uiState.value = _uiState.value.copy(isSseConnected = true)
-        println("[HealthVM] SSE 连接已建立: userId=$userId")
     }
 
     fun stopSseListening() {
         sseClient.disconnect()
         _uiState.value = _uiState.value.copy(isSseConnected = false)
-        println("[HealthVM] SSE 连接已断开")
     }
 
     private fun refreshLatestMetrics() {
@@ -112,15 +105,80 @@ class HealthViewModel @Inject constructor(
         }
     }
 
-    private fun toInt(value: Any?): Int? {
-        return when (value) {
-            is Number -> value.toInt()
-            is String -> value.toDoubleOrNull()?.toInt()
-            else -> null
-        }
+    private fun toInt(value: Any?): Int? = when (value) {
+        is Number -> value.toInt()
+        is String -> value.toDoubleOrNull()?.toInt()
+        else -> null
     }
 
-    private fun parseBattery(value: Any?): Int? {
-        return try {
-            if (value is Number) value.toInt()
-            else if (value is Map<*, *>) toInt((value as Map<*, *>)[
+    private fun toDouble(value: Any?): Double? = when (value) {
+        is Number -> value.toDouble()
+        is String -> value.toDoubleOrNull()
+        else -> null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseBattery(value: Any?): Int? = try {
+        when (value) {
+            is Number -> value.toInt()
+            is Map<*, *> -> toInt((value as Map<String, Any>)["level"])
+            else -> null
+        }
+    } catch (e: Exception) { null }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseHeartRate(value: Any?): Int? = try {
+        when (value) {
+            is Number -> value.toInt()
+            is Map<*, *> -> toInt((value as Map<String, Any>)["bpm"])
+            else -> null
+        }
+    } catch (e: Exception) { null }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseBloodPressure(value: Any?): String? = try {
+        if (value is Map<*, *>) {
+            val map = value as Map<String, Any>
+            val systolic = toInt(map["systolic"]) ?: return null
+            val diastolic = toInt(map["diastolic"]) ?: return null
+            "$systolic/$diastolic"
+        } else null
+    } catch (e: Exception) { null }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseCardioIndex(value: Any?): String? = try {
+        if (value is Map<*, *>) {
+            val map = value as Map<String, Any>
+            val index = toDouble(map["index"]) ?: toDouble(map["cardio_index"]) ?: toDouble(map["value"])
+            index?.let { String.format("%.1f", it) }
+        } else if (value is Number) String.format("%.1f", value.toDouble())
+        else null
+    } catch (e: Exception) { null }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseCardioRisk(value: Any?): String? = try {
+        if (value is Map<*, *>) {
+            val map = value as Map<String, Any>
+            val risk = toDouble(map["risk"]) ?: toDouble(map["cardio_risk"])
+            risk?.let { String.format("%.1f", it) }
+        } else null
+    } catch (e: Exception) { null }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseHrv(value: Any?): String? = try {
+        if (value is Map<*, *>) {
+            val map = value as Map<String, Any>
+            val rmssd = toDouble(map["rmssd"])
+            val score = toDouble(map["score"])
+            if (rmssd != null && score != null) {
+                "RMSSD: ${String.format("%.1f", rmssd)} Score: ${String.format("%.0f", score)}"
+            } else rmssd?.let { "RMSSD: ${String.format("%.1f", it)}" }
+        } else if (value is Number) String.format("%.1f", value.toDouble())
+        else null
+    } catch (e: Exception) { null }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopSseListening()
+    }
+}
