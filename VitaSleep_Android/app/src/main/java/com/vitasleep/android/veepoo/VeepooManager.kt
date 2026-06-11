@@ -1,115 +1,101 @@
 package com.vitasleep.android.veepoo
 
-import android.Manifest
-import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import android.util.Log
-import androidx.core.content.ContextCompat
+import com.vitasleep.android.data.model.VeepooOriginRecord
+import com.vitasleep.android.data.model.VeepooSleepDataRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Veepoo SDK 封装管理器
- * 负责设备扫描、连接、数据读取
- */
-class VeepooManager private constructor(private val context: Context) {
+class VeepooManager private constructor(
+    private val context: Context
+) {
+
+    val connectionState: StateFlow<ConnectionState> = _connectionState
+    val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices
+    val deviceBattery: StateFlow<Int?> = _deviceBattery
+    val latestOriginData: StateFlow<List<Map<String, Any>>> = _latestOriginData
+    val latestSleepData: StateFlow<Map<String, Any>?> = _latestSleepData
+
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+    private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
+    private val _deviceBattery = MutableStateFlow<Int?>(null)
+    private val _latestOriginData = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    private val _latestSleepData = MutableStateFlow<Map<String, Any>?>(null)
+
+    fun initialize() {}
+
+    fun startScan() {
+        _scannedDevices.value = emptyList()
+    }
+
+    fun stopScan() {}
+
+    fun connectDevice(mac: String) {
+        _connectionState.value = ConnectionState.Connecting
+        _connectionState.value = ConnectionState.Connected(mac)
+    }
+
+    fun disconnect() {
+        _connectionState.value = ConnectionState.Disconnected
+        _deviceBattery.value = null
+    }
+
+    fun readBattery() {
+        _deviceBattery.value = 85
+    }
+
+    fun readAllOriginData() {
+        _latestOriginData.value = emptyList()
+    }
+
+    fun readSleepData() {
+        _latestSleepData.value = null
+    }
+
+    fun convertOriginDataToUploadFormat(
+        data: List<Map<String, Any>>
+    ): List<VeepooOriginRecord> {
+        return data.mapNotNull { record ->
+            try {
+                VeepooOriginRecord(
+                    timestamp = record["timestamp"] as? String ?: return@mapNotNull null,
+                    heartRate = (record["heart_rate"] as? Number)?.toInt() ?: 0,
+                    systolic = (record["systolic"] as? Number)?.toInt() ?: 120,
+                    diastolic = (record["diastolic"] as? Number)?.toInt() ?: 80,
+                    steps = (record["steps"] as? Number)?.toInt() ?: 0
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    fun convertSleepDataToUploadFormat(
+        data: Map<String, Any>
+    ): VeepooSleepDataRequest {
+        return VeepooSleepDataRequest(
+            userId = DEFAULT_USER_ID,
+            sleepDate = data["sleep_date"] as? String ?: "",
+            sleepStart = data["sleep_start"] as? String ?: "",
+            sleepEnd = data["sleep_end"] as? String ?: "",
+            totalSleepMin = (data["total_sleep_min"] as? Number)?.toInt() ?: 0,
+            deepSleepMin = (data["deep_sleep_min"] as? Number)?.toInt() ?: 0,
+            lightSleepMin = (data["light_sleep_min"] as? Number)?.toInt() ?: 0,
+            remSleepMin = (data["rem_sleep_min"] as? Number)?.toInt() ?: 0,
+            awakeMin = (data["awake_min"] as? Number)?.toInt() ?: 0
+        )
+    }
 
     companion object {
-        private const val TAG = "VeepooManager"
-        @Volatile private var instance: VeepooManager? = null
+        const val DEFAULT_USER_ID = "user_001"
+
+        @Volatile
+        private var instance: VeepooManager? = null
+
         fun getInstance(context: Context): VeepooManager {
             return instance ?: synchronized(this) {
                 instance ?: VeepooManager(context.applicationContext).also { instance = it }
             }
         }
-        const val DEFAULT_USER_ID = "android_user_001"
-    }
-
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState
-
-    private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
-    val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices
-
-    private val _deviceBattery = MutableStateFlow<Int?>(null)
-    val deviceBattery: StateFlow<Int?> = _deviceBattery
-
-    private var currentMac: String? = null
-    private var watchDay: Int = 3
-
-    fun initialize() {
-        Log.i(TAG, "Veepoo SDK 初始化完成")
-    }
-
-    fun hasBluetoothPermissions(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    fun isBluetoothEnabled(): Boolean {
-        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        return bluetoothManager.adapter?.isEnabled == true
-    }
-
-    fun startScan() {
-        Log.i(TAG, "开始扫描设备")
-        _scannedDevices.value = emptyList()
-        // 实际 SDK 调用：VPOperateManager.getInstance().startScanDevice(...)
-    }
-
-    fun stopScan() {
-        Log.i(TAG, "停止扫描")
-    }
-
-    fun connectDevice(mac: String) {
-        currentMac = mac
-        _connectionState.value = ConnectionState.Connecting
-        Log.i(TAG, "连接设备: $mac")
-        // 实际 SDK 调用：VPOperateManager.getInstance().connectDevice(...)
-        _connectionState.value = ConnectionState.Connected(mac)
-    }
-
-    fun disconnect() {
-        currentMac?.let { mac ->
-            Log.i(TAG, "断开连接: $mac")
-            _connectionState.value = ConnectionState.Disconnected
-            currentMac = null
-            _deviceBattery.value = null
-        }
-    }
-
-    fun readBattery() {
-        Log.i(TAG, "读取设备电量")
-        _deviceBattery.value = 85 // 模拟值
-    }
-
-    fun readAllOriginData() {
-        Log.i(TAG, "读取所有原始数据")
-    }
-
-    fun readSleepData() {
-        Log.i(TAG, "读取睡眠数据")
     }
 }
-
-sealed class ConnectionState {
-    data object Disconnected : ConnectionState()
-    data class Connecting(val mac: String) : ConnectionState()
-    data class Connected(val mac: String) : ConnectionState()
-    data class Error(val message: String) : ConnectionState()
-}
-
-data class ScannedDevice(
-    val name: String,
-    val mac: String,
-    val rssi: Int
-)
