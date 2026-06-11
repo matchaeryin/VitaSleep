@@ -3,7 +3,6 @@ package com.vitasleep.android.ui.screens.device
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vitasleep.android.data.repository.ApiResult
 import com.vitasleep.android.data.repository.VeepooRepository
 import com.vitasleep.android.veepoo.ConnectionState
 import com.vitasleep.android.veepoo.ScannedDevice
@@ -16,7 +15,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DeviceViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val veepooRepository: VeepooRepository
 ) : ViewModel() {
 
@@ -37,9 +36,14 @@ class DeviceViewModel @Inject constructor(
     fun connect(device: ScannedDevice) { veepooManager.connectDevice(device.mac) }
     fun disconnect() { veepooManager.disconnect() }
     fun readBattery() { veepooManager.readBattery() }
-    fun readAllOriginData() { _syncState.value = SyncState.ReadingData; veepooManager.readAllOriginData() }
-    fun readSleepData() { _syncState.value = SyncState.ReadingSleep; veepooManager.readSleepData() }
-
+    fun readAllOriginData() {
+        _syncState.value = SyncState.ReadingData
+        veepooManager.readAllOriginData()
+    }
+    fun readSleepData() {
+        _syncState.value = SyncState.ReadingSleep
+        veepooManager.readSleepData()
+    }
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         viewModelScope.launch {
             _syncState.value = SyncState.Uploading
@@ -49,10 +53,10 @@ class DeviceViewModel @Inject constructor(
 }
 
 sealed class SyncState {
-    data object Idle : SyncState()
-    data object ReadingData : SyncState()
-    data object ReadingSleep : SyncState()
-    data object Uploading : SyncState()
+    object Idle : SyncState()
+    object ReadingData : SyncState()
+    object ReadingSleep : SyncState()
+    object Uploading : SyncState()
     data class Success(val message: String) : SyncState()
     data class Error(val message: String) : SyncState()
 }
