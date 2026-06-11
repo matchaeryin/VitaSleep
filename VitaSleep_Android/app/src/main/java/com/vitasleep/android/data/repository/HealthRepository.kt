@@ -14,45 +14,13 @@ class HealthRepository @Inject constructor(
     fun getLatestMetrics(userId: String): Flow<ApiResult<Map<String, HealthMetric>>> = flow {
         emit(ApiResult.Loading)
         try {
-            val response = api.getLatestMetrics(userId)
+            val response = api.getHealthMetrics(userId, limit = 10)
             if (response.isSuccessful) {
-                emit(ApiResult.Success(response.body() ?: emptyMap()))
+                val metrics = response.body() ?: emptyList()
+                val map = metrics.associateBy { it.metricType }
+                emit(ApiResult.Success(map))
             } else {
                 emit(ApiResult.Error("获取数据失败: ${response.code()}", response.code()))
-            }
-        } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "网络错误"))
-        }
-    }
-
-    fun getMetricsByType(
-        userId: String,
-        metricType: String,
-        limit: Int = 100
-    ): Flow<ApiResult<List<HealthMetric>>> = flow {
-        emit(ApiResult.Loading)
-        try {
-            val response = api.getHealthMetrics(userId, metricType, limit = limit)
-            if (response.isSuccessful) {
-                emit(ApiResult.Success(response.body()?.metrics ?: emptyList()))
-            } else {
-                emit(ApiResult.Error("获取数据失败", response.code()))
-            }
-        } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "网络错误"))
-        }
-    }
-
-    fun getBattery(userId: String): Flow<ApiResult<HealthMetric>> = flow {
-        emit(ApiResult.Loading)
-        try {
-            val response = api.getBattery(userId)
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    emit(ApiResult.Success(it))
-                } ?: emit(ApiResult.Error("无数据"))
-            } else {
-                emit(ApiResult.Error("获取失败", response.code()))
             }
         } catch (e: Exception) {
             emit(ApiResult.Error(e.message ?: "网络错误"))

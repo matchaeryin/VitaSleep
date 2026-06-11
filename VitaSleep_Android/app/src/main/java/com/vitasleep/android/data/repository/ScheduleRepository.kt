@@ -11,14 +11,10 @@ import javax.inject.Singleton
 class ScheduleRepository @Inject constructor(
     private val api: VitaSleepApi
 ) {
-    fun getSchedules(
-        userId: String,
-        startTime: String? = null,
-        endTime: String? = null
-    ): Flow<ApiResult<List<Schedule>>> = flow {
+    fun getSchedules(userId: String): Flow<ApiResult<List<Schedule>>> = flow {
         emit(ApiResult.Loading)
         try {
-            val response = api.getSchedules(userId, startTime, endTime)
+            val response = api.getSchedules(userId)
             if (response.isSuccessful) {
                 emit(ApiResult.Success(response.body() ?: emptyList()))
             } else {
@@ -36,19 +32,6 @@ class ScheduleRepository @Inject constructor(
                 ApiResult.Success(response.body()!!)
             } else {
                 ApiResult.Error("创建失败", response.code())
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "网络错误")
-        }
-    }
-
-    suspend fun updateSchedule(id: Int, updates: Map<String, Any>): ApiResult<Schedule> {
-        return try {
-            val response = api.updateSchedule(id, updates)
-            if (response.isSuccessful) {
-                ApiResult.Success(response.body()!!)
-            } else {
-                ApiResult.Error("更新失败", response.code())
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "网络错误")

@@ -10,17 +10,17 @@ class VeepooManager private constructor(
     private val context: Context
 ) {
 
-    val connectionState: StateFlow<ConnectionState> = _connectionState
-    val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices
-    val deviceBattery: StateFlow<Int?> = _deviceBattery
-    val latestOriginData: StateFlow<List<Map<String, Any>>> = _latestOriginData
-    val latestSleepData: StateFlow<Map<String, Any>?> = _latestSleepData
-
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
     private val _deviceBattery = MutableStateFlow<Int?>(null)
     private val _latestOriginData = MutableStateFlow<List<Map<String, Any>>>(emptyList())
     private val _latestSleepData = MutableStateFlow<Map<String, Any>?>(null)
+
+    val connectionState: StateFlow<ConnectionState> = _connectionState
+    val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices
+    val deviceBattery: StateFlow<Int?> = _deviceBattery
+    val latestOriginData: StateFlow<List<Map<String, Any>>> = _latestOriginData
+    val latestSleepData: StateFlow<Map<String, Any>?> = _latestSleepData
 
     fun initialize() {}
 
