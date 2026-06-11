@@ -25,6 +25,7 @@ class DeviceViewModel @Inject constructor(
     val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
+    val isScanning = veepooManager.scanning
     val hasBluetooth = veepooManager.hasBluetooth()
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -36,7 +37,7 @@ class DeviceViewModel @Inject constructor(
     @SuppressLint("MissingPermission")
     fun startScan() {
         if (!veepooManager.hasBluetooth()) {
-            println("[DeviceViewModel] 蓝牙未开启，无法扫描")
+            println("[DeviceViewModel] bluetooth not enabled, cannot scan")
             return
         }
         veepooManager.startScan()
@@ -57,7 +58,7 @@ class DeviceViewModel @Inject constructor(
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         viewModelScope.launch {
             _syncState.value = SyncState.Uploading
-            _syncState.value = SyncState.Success("上传完成")
+            _syncState.value = SyncState.Success("upload complete")
         }
     }
 }
