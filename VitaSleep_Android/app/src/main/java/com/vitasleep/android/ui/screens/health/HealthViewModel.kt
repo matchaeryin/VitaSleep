@@ -136,14 +136,16 @@ class HealthViewModel @Inject constructor(
     } catch (e: Exception) { null }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseBloodPressure(value: Any?): String? = try {
-        if (value is Map<*, *>) {
-            val map = value as Map<String, Any>
-            val systolic = toInt(map["systolic"]) ?: return null
-            val diastolic = toInt(map["diastolic"]) ?: return null
-            "$systolic/$diastolic"
-        } else null
-    } catch (e: Exception) { null }
+    private fun parseBloodPressure(value: Any?): String? {
+        return try {
+            if (value is Map<*, *>) {
+                val map = value as Map<String, Any>
+                val systolic = toInt(map["systolic"])
+                val diastolic = toInt(map["diastolic"])
+                if (systolic != null && diastolic != null) "$systolic/$diastolic" else null
+            } else null
+        } catch (e: Exception) { null }
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun parseCardioIndex(value: Any?): String? = try {
