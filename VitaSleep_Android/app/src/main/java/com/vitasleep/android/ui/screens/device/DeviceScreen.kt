@@ -1,5 +1,6 @@
 package com.vitasleep.android.ui.screens.device
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -17,13 +18,18 @@ import com.vitasleep.android.veepoo.ScannedDevice
 @Composable
 fun DeviceScreen(
     viewModel: DeviceViewModel = hiltViewModel(),
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit,
+    onRequestEnableBluetooth: () -> Unit
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val scannedDevices by viewModel.scannedDevices.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Text(
             "设备管理",
             style = MaterialTheme.typography.headlineMedium,
@@ -33,13 +39,17 @@ fun DeviceScreen(
 
         Card(colors = CardDefaults.cardColors(containerColor = Surface)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     "状态: ${when (connectionState) {
                         is ConnectionState.Connected -> "已连接"
                         is ConnectionState.Connecting -> "连接中"
+                        is ConnectionState.Error -> "错误"
                         else -> "未连接"
                     }}",
                     color = OnSurface
@@ -54,21 +64,67 @@ fun DeviceScreen(
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         when (connectionState) {
             is ConnectionState.Disconnected -> {
-                Button(
-                    onClick = { viewModel.startScan() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) {
-                    Icon(Icons.Default.Search, null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("扫描设备")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                scannedDevices.forEach { device ->
-                    DeviceItem(device, onClick = { viewModel.connect(device) })
+                if (!viewModel.hasBluetooth) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.BluetoothDisabled,
+                                null,
+                                tint = OnSurfaceVariant,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("蓝牙未开启", color = OnSurface)
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = onRequestEnableBluetooth) {
+                                Text("开启蓝牙")
+                            }
+                        }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                onRequestPermissions()
+                                viewModel.startScan()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                        ) {
+                            Icon(Icons.Default.Search, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("扫描设备")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (scannedDevices.isEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("点击扫描按钮搜索附近的 Veepoo 设备", color = OnSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    scannedDevices.forEach { device ->
+                        DeviceItem(device, onClick = { viewModel.connect(device) })
+                    }
                 }
             }
             is ConnectionState.Connected -> {
@@ -82,8 +138,35 @@ fun DeviceScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = Primary)
                     ) { Text("上传数据") }
                 }
+
+                when (syncState) {
+                    is SyncState.ReadingData -> {
+                        Spacer(Modifier.height(12.dp))
+                        CircularProgressIndicator(color = Primary)
+                    }
+                    is SyncState.Uploading -> {
+                        Spacer(Modifier.height(12.dp))
+                        CircularProgressIndicator(color = Primary)
+                    }
+                    is SyncState.Success -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text("操作成功", color = Success)
+                    }
+                    is SyncState.Error -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text("操作失败", color = Error)
+                    }
+                    else -> {}
+                }
             }
-            else -> CircularProgressIndicator(color = Primary)
+            is ConnectionState.Connecting -> {
+                CircularProgressIndicator(color = Primary)
+                Spacer(Modifier.height(8.dp))
+                Text("正在连接...", color = OnSurfaceVariant)
+            }
+            is ConnectionState.Error -> {
+                Text("连接错误: ${(connectionState as ConnectionState.Error).message}", color = Error)
+            }
         }
     }
 }

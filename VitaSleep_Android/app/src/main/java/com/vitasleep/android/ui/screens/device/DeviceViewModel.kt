@@ -1,5 +1,6 @@
 package com.vitasleep.android.ui.screens.device
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +25,7 @@ class DeviceViewModel @Inject constructor(
     val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
+    val hasBluetooth = veepooManager.hasBluetooth()
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState
@@ -31,7 +33,15 @@ class DeviceViewModel @Inject constructor(
     private val _uploadResult = MutableStateFlow<String?>(null)
     val uploadResult: StateFlow<String?> = _uploadResult
 
-    fun startScan() { veepooManager.startScan() }
+    @SuppressLint("MissingPermission")
+    fun startScan() {
+        if (!veepooManager.hasBluetooth()) {
+            println("[DeviceViewModel] 蓝牙未开启，无法扫描")
+            return
+        }
+        veepooManager.startScan()
+    }
+
     fun stopScan() { veepooManager.stopScan() }
     fun connect(device: ScannedDevice) { veepooManager.connectDevice(device.mac) }
     fun disconnect() { veepooManager.disconnect() }
