@@ -1,6 +1,7 @@
 package com.vitasleep.android.veepoo
 
 import android.content.Context
+import android.util.Log
 import com.veepoo.protocol.VPOperateManager
 import com.veepoo.protocol.listener.base.IABleConnectStatusListener
 import com.veepoo.protocol.listener.base.IBleWriteResponse
@@ -89,7 +90,11 @@ class VeepooManager private constructor(
     }
 
     fun initialize() {
-        vpOperateManager.init(context)
+        try {
+            vpOperateManager.init(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "SDK init failed", e)
+        }
     }
 
     fun hasBluetooth(): Boolean = true
@@ -98,12 +103,21 @@ class VeepooManager private constructor(
         if (_isScanning.value) return
         scannedMap.clear()
         _scannedDevices.value = emptyList()
-        vpOperateManager.startScanDevice(searchResponse)
+        try {
+            vpOperateManager.startScanDevice(searchResponse)
+        } catch (e: Exception) {
+            Log.e(TAG, "startScan failed", e)
+            _isScanning.value = false
+        }
     }
 
     fun stopScan() {
         if (!_isScanning.value) return
-        vpOperateManager.stopScanDevice()
+        try {
+            vpOperateManager.stopScanDevice()
+        } catch (e: Exception) {
+            Log.e(TAG, "stopScan failed", e)
+        }
         _isScanning.value = false
     }
 
@@ -113,82 +127,108 @@ class VeepooManager private constructor(
         connectedMac = mac
         connectedName = name
 
-        vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
+        try {
+            vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
+        } catch (e: Exception) {
+            Log.e(TAG, "registerConnectStatusListener failed", e)
+        }
 
-        vpOperateManager.connectDevice(mac, name, object : IConnectResponse {
-            override fun connectState(code: Int, profile: BleGattProfile, isoadModel: Boolean) {
-                if (code == Code.REQUEST_SUCCESS) {
-                    isOadModel = isoadModel
-                } else {
-                    _connectionState.value = ConnectionState.Error("连接失败")
+        try {
+            vpOperateManager.connectDevice(mac, name, object : IConnectResponse {
+                override fun connectState(code: Int, profile: BleGattProfile, isoadModel: Boolean) {
+                    if (code == Code.REQUEST_SUCCESS) {
+                        isOadModel = isoadModel
+                    } else {
+                        _connectionState.value = ConnectionState.Error("连接失败")
+                    }
                 }
-            }
-        }, object : INotifyResponse {
-            override fun notifyState(state: Int) {
-                if (state == Code.REQUEST_SUCCESS) {
-                    _connectionState.value = ConnectionState.Confirming
-                    confirmDevicePwd()
-                } else {
-                    _connectionState.value = ConnectionState.Error("通知服务注册失败")
+            }, object : INotifyResponse {
+                override fun notifyState(state: Int) {
+                    if (state == Code.REQUEST_SUCCESS) {
+                        _connectionState.value = ConnectionState.Confirming
+                        confirmDevicePwd()
+                    } else {
+                        _connectionState.value = ConnectionState.Error("通知服务注册失败")
+                    }
                 }
-            }
-        })
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "connectDevice failed", e)
+            _connectionState.value = ConnectionState.Error("连接异常: ${e.message}")
+        }
     }
 
     private fun confirmDevicePwd() {
-        vpOperateManager.confirmDevicePwd(
-            object : IBleWriteResponse {
-                override fun onResponse(code: Int) {}
-            },
-            object : IPwdDataListener {
-                override fun onPwdDataChange(pwdData: PwdData) {}
-                override fun onConnectionConfirmTimeout() {
-                    _connectionState.value = ConnectionState.Error("密码确认超时")
-                }
-            },
-            object : IDeviceFuctionDataListener {
-                override fun onFunctionSupportDataChange(functionSupport: FunctionDeviceSupportData) {
-                    watchDataDay = functionSupport.wathcDay
-                }
-                override fun onDeviceFunctionPackage1Report(p1: DeviceFunctionPackage1) {}
-                override fun onDeviceFunctionPackage2Report(p2: DeviceFunctionPackage2) {}
-                override fun onDeviceFunctionPackage3Report(p3: DeviceFunctionPackage3) {}
-                override fun onDeviceFunctionPackage4Report(p4: DeviceFunctionPackage4) {}
-                override fun onDeviceFunctionPackage5Report(p5: DeviceFunctionPackage5) {}
-            },
-            object : ISocialMsgDataListener {
-                override fun onSocialMsgSupportDataChange(data: FunctionSocailMsgData) {}
-                override fun onSocialMsgSupportDataChange2(data: FunctionSocailMsgData) {}
-            },
-            object : ICustomSettingDataListener {
-                override fun OnSettingDataChange(customSettingData: CustomSettingData) {
-                    _connectionState.value = ConnectionState.Connected(
-                        mac = connectedMac ?: "",
-                        name = connectedName ?: ""
-                    )
-                }
-            },
-            "0000",
-            true
-        )
+        try {
+            vpOperateManager.confirmDevicePwd(
+                object : IBleWriteResponse {
+                    override fun onResponse(code: Int) {}
+                },
+                object : IPwdDataListener {
+                    override fun onPwdDataChange(pwdData: PwdData) {}
+                    override fun onConnectionConfirmTimeout() {
+                        _connectionState.value = ConnectionState.Error("密码确认超时")
+                    }
+                },
+                object : IDeviceFuctionDataListener {
+                    override fun onFunctionSupportDataChange(functionSupport: FunctionDeviceSupportData) {
+                        watchDataDay = functionSupport.wathcDay
+                    }
+                    override fun onDeviceFunctionPackage1Report(p1: DeviceFunctionPackage1) {}
+                    override fun onDeviceFunctionPackage2Report(p2: DeviceFunctionPackage2) {}
+                    override fun onDeviceFunctionPackage3Report(p3: DeviceFunctionPackage3) {}
+                    override fun onDeviceFunctionPackage4Report(p4: DeviceFunctionPackage4) {}
+                    override fun onDeviceFunctionPackage5Report(p5: DeviceFunctionPackage5) {}
+                },
+                object : ISocialMsgDataListener {
+                    override fun onSocialMsgSupportDataChange(data: FunctionSocailMsgData) {}
+                    override fun onSocialMsgSupportDataChange2(data: FunctionSocailMsgData) {}
+                },
+                object : ICustomSettingDataListener {
+                    override fun OnSettingDataChange(customSettingData: CustomSettingData) {
+                        _connectionState.value = ConnectionState.Connected(
+                            mac = connectedMac ?: "",
+                            name = connectedName ?: ""
+                        )
+                    }
+                },
+                "0000",
+                true
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "confirmDevicePwd failed", e)
+            _connectionState.value = ConnectionState.Error("密码确认异常: ${e.message}")
+        }
     }
 
     fun disconnect() {
-        vpOperateManager.disconnectWatch(defaultWriteResponse)
-        connectedMac?.let { vpOperateManager.unregisterConnectStatusListener(it, connectStatusListener) }
+        try {
+            vpOperateManager.disconnectWatch(defaultWriteResponse)
+        } catch (e: Exception) {
+            Log.e(TAG, "disconnectWatch failed", e)
+        }
+        try {
+            connectedMac?.let { vpOperateManager.unregisterConnectStatusListener(it, connectStatusListener) }
+        } catch (e: Exception) {
+            Log.e(TAG, "unregisterConnectStatusListener failed", e)
+        }
         _connectionState.value = ConnectionState.Disconnected
         _deviceBattery.value = null
     }
 
     fun readBattery() {
-        vpOperateManager.readBattery(object : IBleWriteResponse {
-            override fun onResponse(code: Int) {}
-        }, object : IBatteryDataListener {
-            override fun onDataChange(batteryData: BatteryData) {
-                val percent = batteryData.batteryPercent
-                _deviceBattery.value = if (percent > 0) percent else batteryData.batteryLevel * 25
-            }
-        })
+        try {
+            vpOperateManager.readBattery(object : IBleWriteResponse {
+                override fun onResponse(code: Int) {}
+            }, object : IBatteryDataListener {
+                override fun onDataChange(batteryData: BatteryData) {
+                    val percent = batteryData.batteryPercent
+                    _deviceBattery.value = if (percent > 0) percent else batteryData.batteryLevel * 25
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "readBattery failed", e)
+        }
     }
 
     fun readAllOriginData() {
@@ -197,108 +237,117 @@ class VeepooManager private constructor(
         _originDataReading.value = true
         val collectedOriginData = mutableListOf<Map<String, Any>>()
 
-        vpOperateManager.readOriginData(
-            object : IBleWriteResponse {
-                override fun onResponse(code: Int) {}
-            },
-            object : IOriginData3Listener {
-                override fun onOriginFiveMinuteListDataChange(originDataList: MutableList<OriginData3>) {
-                    for (originData in originDataList) {
-                        val timeData = originData.getmTime()
-                        val timestamp = String.format(
-                            Locale.getDefault(),
-                            "%04d-%02d-%02dT%02d:%02d:00",
-                            timeData.year, timeData.month, timeData.day,
-                            timeData.hour, timeData.minute
-                        )
-                        val record = mapOf<String, Any>(
-                            "timestamp" to timestamp,
-                            "heart_rate" to originData.rateValue,
-                            "systolic" to originData.highValue,
-                            "diastolic" to originData.lowValue,
-                            "steps" to originData.stepValue,
-                            "sport" to originData.sportValue
-                        )
-                        collectedOriginData.add(record)
+        try {
+            vpOperateManager.readOriginData(
+                object : IBleWriteResponse {
+                    override fun onResponse(code: Int) {}
+                },
+                object : IOriginData3Listener {
+                    override fun onOriginFiveMinuteListDataChange(originDataList: MutableList<OriginData3>) {
+                        for (originData in originDataList) {
+                            val timeData = originData.getmTime()
+                            val timestamp = String.format(
+                                Locale.getDefault(),
+                                "%04d-%02d-%02dT%02d:%02d:00",
+                                timeData.year, timeData.month, timeData.day,
+                                timeData.hour, timeData.minute
+                            )
+                            val record = mapOf<String, Any>(
+                                "timestamp" to timestamp,
+                                "heart_rate" to originData.rateValue,
+                                "systolic" to originData.highValue,
+                                "diastolic" to originData.lowValue,
+                                "steps" to originData.stepValue,
+                                "sport" to originData.sportValue
+                            )
+                            collectedOriginData.add(record)
+                        }
+                        _latestOriginData.value = collectedOriginData.toList()
                     }
-                    _latestOriginData.value = collectedOriginData.toList()
-                }
 
-                override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {}
+                    override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {}
 
-                override fun onOriginHRVOriginListDataChange(originHrvDataList: MutableList<HRVOriginData>) {}
+                    override fun onOriginHRVOriginListDataChange(originHrvDataList: MutableList<HRVOriginData>) {}
 
-                override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: MutableList<Spo2hOriginData>) {}
+                    override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: MutableList<Spo2hOriginData>) {}
 
-                override fun onReadOriginProgress(progress: Float) {
-                    _originDataProgress.value = progress
-                }
+                    override fun onReadOriginProgress(progress: Float) {
+                        _originDataProgress.value = progress
+                    }
 
-                override fun onReadOriginProgressDetail(day: Int, date: String, allPackage: Int, currentPackage: Int) {}
+                    override fun onReadOriginProgressDetail(day: Int, date: String, allPackage: Int, currentPackage: Int) {}
 
-                override fun onReadOriginComplete() {
-                    _originDataProgress.value = 1f
-                    _originDataReading.value = false
-                }
-            },
-            watchDataDay
-        )
+                    override fun onReadOriginComplete() {
+                        _originDataProgress.value = 1f
+                        _originDataReading.value = false
+                    }
+                },
+                watchDataDay
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "readAllOriginData failed", e)
+            _originDataReading.value = false
+        }
     }
 
     fun readSleepData() {
         _latestSleepData.value = null
 
-        vpOperateManager.readSleepData(
-            object : IBleWriteResponse {
-                override fun onResponse(code: Int) {}
-            },
-            object : ISleepDataListener {
-                override fun onSleepDataChange(day: String, sleepData: SleepData) {
-                    val sleepDown = sleepData.sleepDown
-                    val sleepUp = sleepData.sleepUp
+        try {
+            vpOperateManager.readSleepData(
+                object : IBleWriteResponse {
+                    override fun onResponse(code: Int) {}
+                },
+                object : ISleepDataListener {
+                    override fun onSleepDataChange(day: String, sleepData: SleepData) {
+                        val sleepDown = sleepData.sleepDown
+                        val sleepUp = sleepData.sleepUp
 
-                    val sleepStart = if (sleepDown != null) {
-                        String.format(
-                            Locale.getDefault(),
-                            "%04d-%02d-%02dT%02d:%02d:00",
-                            sleepDown.year, sleepDown.month, sleepDown.day,
-                            sleepDown.hour, sleepDown.minute
+                        val sleepStart = if (sleepDown != null) {
+                            String.format(
+                                Locale.getDefault(),
+                                "%04d-%02d-%02dT%02d:%02d:00",
+                                sleepDown.year, sleepDown.month, sleepDown.day,
+                                sleepDown.hour, sleepDown.minute
+                            )
+                        } else ""
+
+                        val sleepEnd = if (sleepUp != null) {
+                            String.format(
+                                Locale.getDefault(),
+                                "%04d-%02d-%02dT%02d:%02d:00",
+                                sleepUp.year, sleepUp.month, sleepUp.day,
+                                sleepUp.hour, sleepUp.minute
+                            )
+                        } else ""
+
+                        val totalMin = sleepData.allSleepTime
+                        val deepMin = sleepData.deepSleepTime
+                        val lightMin = sleepData.lowSleepTime
+                        val awakeMin = totalMin - deepMin - lightMin
+
+                        val result = mapOf<String, Any>(
+                            "sleep_date" to day,
+                            "sleep_start" to sleepStart,
+                            "sleep_end" to sleepEnd,
+                            "total_sleep_min" to totalMin,
+                            "deep_sleep_min" to deepMin,
+                            "light_sleep_min" to lightMin,
+                            "rem_sleep_min" to 0,
+                            "awake_min" to awakeMin
                         )
-                    } else ""
+                        _latestSleepData.value = result
+                    }
 
-                    val sleepEnd = if (sleepUp != null) {
-                        String.format(
-                            Locale.getDefault(),
-                            "%04d-%02d-%02dT%02d:%02d:00",
-                            sleepUp.year, sleepUp.month, sleepUp.day,
-                            sleepUp.hour, sleepUp.minute
-                        )
-                    } else ""
-
-                    val totalMin = sleepData.allSleepTime
-                    val deepMin = sleepData.deepSleepTime
-                    val lightMin = sleepData.lowSleepTime
-                    val awakeMin = totalMin - deepMin - lightMin
-
-                    val result = mapOf<String, Any>(
-                        "sleep_date" to day,
-                        "sleep_start" to sleepStart,
-                        "sleep_end" to sleepEnd,
-                        "total_sleep_min" to totalMin,
-                        "deep_sleep_min" to deepMin,
-                        "light_sleep_min" to lightMin,
-                        "rem_sleep_min" to 0,
-                        "awake_min" to awakeMin
-                    )
-                    _latestSleepData.value = result
-                }
-
-                override fun onSleepProgress(progress: Float) {}
-                override fun onSleepProgressDetail(day: String, packagenumber: Int) {}
-                override fun onReadSleepComplete() {}
-            },
-            watchDataDay
-        )
+                    override fun onSleepProgress(progress: Float) {}
+                    override fun onSleepProgressDetail(day: String, packagenumber: Int) {}
+                    override fun onReadSleepComplete() {}
+                },
+                watchDataDay
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "readSleepData failed", e)
+        }
     }
 
     fun convertOriginDataToUploadFormat(
@@ -336,6 +385,7 @@ class VeepooManager private constructor(
     }
 
     companion object {
+        private const val TAG = "VeepooManager"
         const val DEFAULT_USER_ID = "user_001"
 
         @Volatile
