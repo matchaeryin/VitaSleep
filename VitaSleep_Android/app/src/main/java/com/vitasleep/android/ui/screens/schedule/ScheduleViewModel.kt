@@ -25,13 +25,17 @@ class ScheduleViewModel @Inject constructor(private val repository: ScheduleRepo
 
     fun loadSchedules(userId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            repository.getSchedules(userId).collect { result ->
-                when (result) {
-                    is ApiResult.Success -> _uiState.value = _uiState.value.copy(isLoading = false, schedules = result.data, error = null)
-                    is ApiResult.Error -> _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
-                    ApiResult.Loading -> {}
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                repository.getSchedules(userId).collect { result ->
+                    when (result) {
+                        is ApiResult.Success -> _uiState.value = _uiState.value.copy(isLoading = false, schedules = result.data, error = null)
+                        is ApiResult.Error -> _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                        ApiResult.Loading -> {}
+                    }
                 }
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "加载失败")
             }
         }
     }
@@ -44,7 +48,7 @@ class ScheduleViewModel @Inject constructor(private val repository: ScheduleRepo
                     is ApiResult.Success -> _uiState.value = _uiState.value.copy(schedules = _uiState.value.schedules + result.data)
                     else -> {}
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
@@ -52,9 +56,13 @@ class ScheduleViewModel @Inject constructor(private val repository: ScheduleRepo
 
     fun deleteSchedule(id: Int) {
         viewModelScope.launch {
-            when (repository.deleteSchedule(id)) {
-                is ApiResult.Success -> _uiState.value = _uiState.value.copy(schedules = _uiState.value.schedules.filter { it.id != id })
-                else -> {}
+            try {
+                when (repository.deleteSchedule(id)) {
+                    is ApiResult.Success -> _uiState.value = _uiState.value.copy(schedules = _uiState.value.schedules.filter { it.id != id })
+                    else -> {}
+                }
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
     }
