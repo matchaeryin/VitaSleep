@@ -26,6 +26,15 @@ class SseClient @Inject constructor(
     )
     val events: SharedFlow<SseHealthEvent> = _events.asSharedFlow()
 
+    fun connectSafely(userId: String, baseUrl: String) {
+        try {
+            connect(userId, baseUrl)
+        } catch (e: Exception) {
+            println("[SSE] 安全连接失败: ${e.message}")
+            _events.tryEmit(SseHealthEvent.Disconnected(e.message ?: "SSE connection unavailable"))
+        }
+    }
+
     fun connect(userId: String, baseUrl: String) {
         disconnect()
 
@@ -94,12 +103,17 @@ class SseClient @Inject constructor(
                 response: Response?
             ) {
                 println("[SSE] 连接失败: ${t?.message ?: "unknown"}, response=$response")
-                _events.tryEmit(SseHealthEvent.Error(t?.message ?: "SSE 连接失败"))
+                _events.tryEmit(SseHealthEvent.Disconnected(t?.message ?: "SSE 连接失败"))
             }
         }
 
-        eventSource = EventSources.createFactory(okHttpClient)
-            .newEventSource(request, listener)
+        try {
+            eventSource = EventSources.createFactory(okHttpClient)
+                .newEventSource(request, listener)
+        } catch (e: Exception) {
+            println("[SSE] 创建连接失败: ${e.message}")
+            _events.tryEmit(SseHealthEvent.Disconnected(e.message ?: "SSE 连接创建失败"))
+        }
     }
 
     fun disconnect() {
@@ -124,5 +138,5 @@ sealed class SseHealthEvent {
         val data: String?
     ) : SseHealthEvent()
 
-    data class Error(val message: String) : SseHealthEvent()
+    data class Disconnected(val message: String) : SseHealthEvent()
 }
