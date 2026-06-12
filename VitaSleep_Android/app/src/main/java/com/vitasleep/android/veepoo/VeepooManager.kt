@@ -92,7 +92,7 @@ class VeepooManager private constructor(
     fun initialize() {
         try {
             vpOperateManager.init(context)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "SDK init failed", e)
         }
     }
@@ -105,7 +105,7 @@ class VeepooManager private constructor(
         _scannedDevices.value = emptyList()
         try {
             vpOperateManager.startScanDevice(searchResponse)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "startScan failed", e)
             _isScanning.value = false
         }
@@ -115,7 +115,7 @@ class VeepooManager private constructor(
         if (!_isScanning.value) return
         try {
             vpOperateManager.stopScanDevice()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "stopScan failed", e)
         }
         _isScanning.value = false
@@ -129,7 +129,7 @@ class VeepooManager private constructor(
 
         try {
             vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "registerConnectStatusListener failed", e)
         }
 
@@ -152,7 +152,7 @@ class VeepooManager private constructor(
                     }
                 }
             })
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "connectDevice failed", e)
             _connectionState.value = ConnectionState.Error("连接异常: ${e.message}")
         }
@@ -195,7 +195,7 @@ class VeepooManager private constructor(
                 "0000",
                 true
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "confirmDevicePwd failed", e)
             _connectionState.value = ConnectionState.Error("密码确认异常: ${e.message}")
         }
@@ -204,12 +204,12 @@ class VeepooManager private constructor(
     fun disconnect() {
         try {
             vpOperateManager.disconnectWatch(defaultWriteResponse)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "disconnectWatch failed", e)
         }
         try {
             connectedMac?.let { vpOperateManager.unregisterConnectStatusListener(it, connectStatusListener) }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "unregisterConnectStatusListener failed", e)
         }
         _connectionState.value = ConnectionState.Disconnected
@@ -226,7 +226,7 @@ class VeepooManager private constructor(
                     _deviceBattery.value = if (percent > 0) percent else batteryData.batteryLevel * 25
                 }
             })
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "readBattery failed", e)
         }
     }
@@ -284,7 +284,7 @@ class VeepooManager private constructor(
                 },
                 watchDataDay
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "readAllOriginData failed", e)
             _originDataReading.value = false
         }
@@ -345,7 +345,7 @@ class VeepooManager private constructor(
                 },
                 watchDataDay
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "readSleepData failed", e)
         }
     }
@@ -362,7 +362,7 @@ class VeepooManager private constructor(
                     diastolic = (record["diastolic"] as? Number)?.toInt() ?: 80,
                     steps = (record["steps"] as? Number)?.toInt() ?: 0
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 null
             }
         }
