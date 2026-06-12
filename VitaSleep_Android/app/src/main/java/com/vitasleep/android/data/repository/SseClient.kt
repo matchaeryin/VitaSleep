@@ -29,7 +29,7 @@ class SseClient @Inject constructor(
     fun connectSafely(userId: String, baseUrl: String) {
         try {
             connect(userId, baseUrl)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             println("[SSE] 安全连接失败: ${e.message}")
             _events.tryEmit(SseHealthEvent.Disconnected(e.message ?: "SSE connection unavailable"))
         }
@@ -87,7 +87,7 @@ class SseClient @Inject constructor(
                                 )
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         println("[SSE] 解析失败: $e, data=$payload")
                     }
                 }
@@ -110,7 +110,7 @@ class SseClient @Inject constructor(
         try {
             eventSource = EventSources.createFactory(okHttpClient)
                 .newEventSource(request, listener)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             println("[SSE] 创建连接失败: ${e.message}")
             _events.tryEmit(SseHealthEvent.Disconnected(e.message ?: "SSE 连接创建失败"))
         }
