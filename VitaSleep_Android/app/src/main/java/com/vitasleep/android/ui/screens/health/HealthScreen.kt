@@ -12,9 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.BatteryStd
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,142 +20,80 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vitasleep.android.data.model.HealthMetric
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.vitasleep.android.ui.theme.*
-import kotlin.math.min
+import com.vitasleep.android.veepoo.VeepooManager
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HealthScreen(
-    metrics: Map<String, HealthMetric>,
-    isLoading: Boolean,
-    error: String?,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun HealthScreen(viewModel: HealthViewModel = hiltViewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val userId = VeepooManager.DEFAULT_USER_ID
+
+    LaunchedEffect(userId) {
+        viewModel.loadLatestMetrics(userId)
+    }
+
     val scrollState = rememberScrollState()
 
-    Scaffold(
-        containerColor = DeepBg,
-        topBar = {
-            SmallTopAppBar(
-                title = {
-                    Text(
-                        "身体状态",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepBg)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 24.dp)
+    ) {
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "身体状态",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (uiState.isLoading && uiState.battery == null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = IceBlue)
+            }
+        } else if (uiState.battery == null && uiState.heartRate == null && uiState.steps == null) {
+            EmptyHealthState()
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                uiState.battery?.let { BatteryRingCard(it) }
+
+                uiState.steps?.let { StepsCard(it) }
+
+                uiState.heartRate?.let { bpm ->
+                    MetricGlowCard(
+                        title = "心率",
+                        value = "$bpm",
+                        unit = "bpm",
+                        glowColor = RoseRed,
+                        textColor = RoseRed
                     )
-                },
-                colors = TopAppBarDefaults.smallTopAppBarColors(
-                    containerColor = DeepBg
-                )
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(DeepBg)
-                .padding(padding)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = IceBlue
-                )
-            } else if (metrics.isEmpty()) {
-                EmptyHealthState()
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    val batteryMetric = metrics["battery"]
-                    if (batteryMetric != null) {
-                        BatteryRingCard(batteryMetric)
-                    }
+                }
 
-                    val stepsMetric = metrics["steps"]
-                    if (stepsMetric != null) {
-                        StepsCard(stepsMetric)
-                    }
+                uiState.bloodPressure?.let { bp ->
+                    BloodPressureCard(bp)
+                }
 
-                    val hrMetric = metrics["heart_rate"]
-                    if (hrMetric != null) {
-                        MetricGlowCard(
-                            title = "心率",
-                            value = formatMetricValue(hrMetric),
-                            unit = "bpm",
-                            icon = Icons.Filled.Favorite,
-                            glowColor = RoseRed,
-                            textColor = RoseRed
-                        )
-                    }
+                uiState.cardioIndex?.let { idx ->
+                    CardioCard(idx, uiState.cardioRisk)
+                }
 
-                    val bpMetric = metrics["blood_pressure"]
-                    if (bpMetric != null) {
-                        BloodPressureCard(bpMetric)
-                    }
-
-                    val spo2Metric = metrics["spo2"]
-                    if (spo2Metric != null) {
-                        MetricGlowCard(
-                            title = "血氧",
-                            value = formatMetricValue(spo2Metric),
-                            unit = "%",
-                            icon = Icons.Filled.Favorite,
-                            glowColor = IceBlue,
-                            textColor = IceBlue
-                        )
-                    }
-
-                    val tempMetric = metrics["body_temp"]
-                    if (tempMetric != null) {
-                        MetricGlowCard(
-                            title = "体温",
-                            value = formatMetricValue(tempMetric),
-                            unit = "°C",
-                            icon = Icons.Filled.Favorite,
-                            glowColor = Amber,
-                            textColor = Amber
-                        )
-                    }
-
-                    val cardioMetric = metrics["cardio"]
-                    if (cardioMetric != null) {
-                        CardioCard(cardioMetric)
-                    }
-
-                    val hrvMetric = metrics["hrv"]
-                    if (hrvMetric != null) {
-                        HrvCard(hrvMetric)
-                    }
-
-                    val stressMetric = metrics["stress"]
-                    if (stressMetric != null) {
-                        MetricGlowCard(
-                            title = "压力",
-                            value = formatMetricValue(stressMetric),
-                            unit = "",
-                            icon = Icons.Filled.Favorite,
-                            glowColor = MintGreen,
-                            textColor = MintGreen
-                        )
-                    }
+                uiState.hrv?.let { hrvStr ->
+                    HrvCard(hrvStr)
                 }
             }
         }
@@ -167,17 +103,15 @@ fun HealthScreen(
 @Composable
 private fun EmptyHealthState() {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Spacer(modifier = Modifier.height(80.dp))
         Box(
             modifier = Modifier
                 .size(80.dp)
-                .background(
-                    color = IceBlueGlow,
-                    shape = CircleShape
-                ),
+                .background(IceBlueGlow, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -188,17 +122,9 @@ private fun EmptyHealthState() {
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "暂无健康数据",
-            color = TextSecondary,
-            fontSize = 16.sp
-        )
+        Text("暂无健康数据", color = TextSecondary, fontSize = 16.sp)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "请先连接设备并读取健康数据",
-            color = TextDim,
-            fontSize = 13.sp
-        )
+        Text("请先连接设备并读取健康数据", color = TextDim, fontSize = 13.sp)
     }
 }
 
@@ -210,15 +136,9 @@ private fun GlassCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                color = GlassBg,
-                shape = RoundedCornerShape(16.dp)
-            )
+            .background(GlassBg, RoundedCornerShape(16.dp))
             .drawBehind {
-                drawRect(
-                    color = GlassBorder,
-                    size = size
-                )
+                drawRect(color = GlassBorder, size = size)
             }
             .padding(16.dp),
         content = content
@@ -226,26 +146,21 @@ private fun GlassCard(
 }
 
 @Composable
-private fun BatteryRingCard(metric: HealthMetric) {
-    val batteryValue = metric.value.toFloatOrNull() ?: 0f
+private fun BatteryRingCard(battery: Int) {
     val animatedProgress = animateFloatAsState(
-        targetValue = batteryValue / 100f,
+        targetValue = battery / 100f,
         animationSpec = tween(1000, easing = LinearEasing),
         label = "battery"
     ).value
 
     val color = when {
-        batteryValue >= 60 -> MintGreen
-        batteryValue >= 20 -> Amber
+        battery >= 60 -> MintGreen
+        battery >= 20 -> Amber
         else -> RoseRed
     }
 
     GlassCard {
-        Text(
-            text = "电池电量",
-            color = TextSecondary,
-            fontSize = 13.sp
-        )
+        Text("电池电量", color = TextSecondary, fontSize = 13.sp)
         Spacer(modifier = Modifier.height(12.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -271,34 +186,24 @@ private fun BatteryRingCard(metric: HealthMetric) {
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "${batteryValue.toInt()}",
+                        "$battery",
                         color = TextPrimary,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "%",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
+                    Text("%", color = TextSecondary, fontSize = 12.sp)
                 }
             }
             Column {
                 Text(
-                    text = when {
-                        batteryValue >= 60 -> "电量充足"
-                        batteryValue >= 20 -> "电量一般"
+                    when {
+                        battery >= 60 -> "电量充足"
+                        battery >= 20 -> "电量一般"
                         else -> "电量不足"
                     },
                     color = color,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = metric.timestamp?.take(16) ?: "",
-                    color = TextDim,
-                    fontSize = 11.sp
                 )
             }
         }
@@ -306,9 +211,7 @@ private fun BatteryRingCard(metric: HealthMetric) {
 }
 
 @Composable
-private fun StepsCard(metric: HealthMetric) {
-    val steps = metric.value.toIntOrNull() ?: 0
-
+private fun StepsCard(steps: Int) {
     GlassCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -317,38 +220,22 @@ private fun StepsCard(metric: HealthMetric) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(
-                        color = MintGreenGlow,
-                        shape = RoundedCornerShape(12.dp)
-                    ),
+                    .background(MintGreenGlow, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.DirectionsWalk,
+                    Icons.Filled.DirectionsWalk,
                     contentDescription = null,
                     tint = MintGreen,
                     modifier = Modifier.size(24.dp)
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "今日步数",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+                Text("今日步数", color = TextSecondary, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "$steps",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("$steps", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
-            Text(
-                text = "步",
-                color = TextDim,
-                fontSize = 14.sp
-            )
+            Text("步", color = TextDim, fontSize = 14.sp)
         }
     }
 }
@@ -358,57 +245,40 @@ private fun MetricGlowCard(
     title: String,
     value: String,
     unit: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     glowColor: Color,
     textColor: Color
 ) {
     GlassCard {
-        Column {
-            Text(
-                text = title,
-                color = TextSecondary,
-                fontSize = 13.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .drawBehind {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(glowColor.copy(alpha = 0.3f), Color.Transparent),
-                                center = Offset(size.width * 0.3f, size.height * 0.5f),
-                                radius = size.width * 0.6f
-                            )
+        Text(title, color = TextSecondary, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(glowColor.copy(alpha = 0.3f), Color.Transparent),
+                            center = Offset(size.width * 0.3f, size.height * 0.5f),
+                            radius = size.width * 0.6f
                         )
-                    }
-                    .padding(vertical = 12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = value,
-                        color = textColor,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = unit,
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
+                .padding(vertical = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(value, color = textColor, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                Text(unit, color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(bottom = 6.dp))
             }
         }
     }
 }
 
 @Composable
-private fun BloodPressureCard(metric: HealthMetric) {
-    val parts = metric.value.split("/")
+private fun BloodPressureCard(bp: String) {
+    val parts = bp.split("/")
     val systolic = parts.getOrNull(0)?.toIntOrNull() ?: 120
     val diastolic = parts.getOrNull(1)?.toIntOrNull() ?: 80
 
@@ -425,64 +295,29 @@ private fun BloodPressureCard(metric: HealthMetric) {
     }
 
     GlassCard {
-        Text(
-            text = "血压",
-            color = TextSecondary,
-            fontSize = 13.sp
-        )
+        Text("血压", color = TextSecondary, fontSize = 13.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = "$systolic",
-                color = TextPrimary,
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "/",
-                color = TextDim,
-                fontSize = 24.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "$diastolic",
-                color = TextPrimary,
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "mmHg",
-                color = TextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
+            Text("$systolic", color = TextPrimary, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+            Text("/", color = TextDim, fontSize = 24.sp, modifier = Modifier.padding(bottom = 4.dp))
+            Text("$diastolic", color = TextPrimary, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+            Text("mmHg", color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(bottom = 6.dp))
         }
         Spacer(modifier = Modifier.height(12.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(statusColor, CircleShape)
-            )
-            Text(
-                text = statusText,
-                color = statusColor,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Box(modifier = Modifier.size(8.dp).background(statusColor, CircleShape))
+            Text(statusText, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(modifier = Modifier.height(8.dp))
         LinearProgressIndicator(
             progress = (systolic.toFloat() / 180f).coerceIn(0f, 1f),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp),
+            modifier = Modifier.fillMaxWidth().height(4.dp),
             color = statusColor,
             trackColor = TextDim.copy(alpha = 0.2f),
         )
@@ -490,8 +325,8 @@ private fun BloodPressureCard(metric: HealthMetric) {
 }
 
 @Composable
-private fun CardioCard(metric: HealthMetric) {
-    val value = metric.value.toIntOrNull() ?: 0
+private fun CardioCard(cardioIndex: String, cardioRisk: String?) {
+    val value = cardioIndex.toDoubleOrNull() ?: 0.0
     val level = when {
         value >= 4 -> "高强度"
         value >= 2 -> "中等强度"
@@ -511,42 +346,24 @@ private fun CardioCard(metric: HealthMetric) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(
-                        color = levelColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
+                    .background(levelColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = levelColor,
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(Icons.Filled.Favorite, contentDescription = null, tint = levelColor, modifier = Modifier.size(24.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "有氧运动",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+                Text("有氧运动", color = TextSecondary, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "$value",
-                        color = TextPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = level,
-                        color = levelColor,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
+                    Text(cardioIndex, color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(level, color = levelColor, fontSize = 13.sp, modifier = Modifier.padding(bottom = 2.dp))
+                }
+                cardioRisk?.let { risk ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(risk, color = TextSecondary, fontSize = 12.sp)
                 }
             }
         }
@@ -554,21 +371,7 @@ private fun CardioCard(metric: HealthMetric) {
 }
 
 @Composable
-private fun HrvCard(metric: HealthMetric) {
-    val value = metric.value.toIntOrNull() ?: 0
-    val status = when {
-        value >= 60 -> "优秀"
-        value >= 40 -> "良好"
-        value >= 20 -> "一般"
-        else -> "偏低"
-    }
-    val statusColor = when {
-        value >= 60 -> MintGreen
-        value >= 40 -> IceBlue
-        value >= 20 -> Amber
-        else -> RoseRed
-    }
-
+private fun HrvCard(hrvStr: String) {
     GlassCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -577,53 +380,16 @@ private fun HrvCard(metric: HealthMetric) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(
-                        color = statusColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
+                    .background(IceBlueGlow, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = statusColor,
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(Icons.Filled.Favorite, contentDescription = null, tint = IceBlue, modifier = Modifier.size(24.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "心率变异性 (HRV)",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+                Text("心率变异性 (HRV)", color = TextSecondary, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "$value",
-                        color = TextPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "ms · $status",
-                        color = statusColor,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                }
+                Text(hrvStr, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
         }
-    }
-}
-
-private fun formatMetricValue(metric: HealthMetric): String {
-    val v = metric.value.toFloatOrNull()
-    return if (v != null && v == v.toInt().toFloat()) {
-        "${v.toInt()}"
-    } else {
-        metric.value
     }
 }
