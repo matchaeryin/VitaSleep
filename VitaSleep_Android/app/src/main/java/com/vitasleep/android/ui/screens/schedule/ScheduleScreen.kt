@@ -41,7 +41,10 @@ fun ScheduleScreen(
     var activeDate by remember { mutableStateOf(today) }
 
     LaunchedEffect(userId) {
-        viewModel.loadSchedules(userId)
+        try {
+            viewModel.loadSchedules(userId)
+        } catch (e: Exception) {
+        }
     }
 
     Column(
