@@ -1,39 +1,85 @@
 import { Router } from 'express';
 import { db } from '../db/init.js';
+import OpenAI from 'openai';
 
 export const chatRouter = Router();
+
+const client = new OpenAI({
+  apiKey: 'b67e4c585b0a48d9a9eefbb391d0826c.ohwZG7dDVRNcgO9j',
+  baseURL: 'https://open.bigmodel.cn/api/coding/paas/v4',
+});
+
+const SYSTEM_PROMPT = `你是 VitaSleep 健康助手，一位专业、温暖、关心用户的健康顾问。
+
+你的职责：
+- 基于用户的健康数据（心率、血压、睡眠、血氧、身体电量等）提供个性化的健康建议
+- 回答用户关于健康、睡眠、运动等方面的问题
+- 用通俗易懂的语言解释健康数据的意义
+- 在发现异常数据时提醒用户关注
+
+注意事项：
+- 你不是医生，遇到严重健康问题应建议用户就医
+- 回复要简洁友好，使用中文
+- 如果有用户的健康数据，请结合数据给出针对性建议
+- 适当使用emoji让回复更亲切`;
 
 function generateHealthResponse(message: string): string {
   const lower = message.toLowerCase();
 
-  if (lower.includes('\u7761\u7720') || lower.includes('\u7761\u4e0d\u7740') || lower.includes('\u5931\u7720')) {
-    return '\u6839\u636e\u60a8\u7684\u7761\u7720\u6570\u636e\u5206\u6790\uff0c\u5efa\u8bae\u60a8\uff1a\n1. \u4fdd\u6301\u89c4\u5f8b\u7684\u4f5c\u606f\u65f6\u95f4\uff0c\u6bcf\u5929\u540c\u4e00\u65f6\u95f4\u4e0a\u5e8a\n2. \u7761\u524d1\u5c0f\u65f6\u907f\u514d\u4f7f\u7528\u7535\u5b50\u8bbe\u5907\n3. \u4fdd\u6301\u5367\u5ba4\u6e29\u5ea6\u572818-22\u00b0C\u4e4b\u95f4\n4. \u5982\u679c\u6301\u7eed\u5931\u7720\u8d85\u8fc72\u5468\uff0c\u5efa\u8bae\u54a8\u8be2\u533b\u751f';
+  if (lower.includes('睡眠') || lower.includes('睡不着') || lower.includes('失眠')) {
+    return '根据您的睡眠数据分析，建议您：\n1. 保持规律的作息时间，每天同一时间上床\n2. 睡前1小时避免使用电子设备\n3. 保持卧室温度在18-22°C之间\n4. 如果持续失眠超过2周，建议咨询医生';
   }
 
-  if (lower.includes('\u5fc3\u7387') || lower.includes('\u5fc3\u810f')) {
-    return '\u5173\u4e8e\u5fc3\u7387\u5065\u5eb7\uff1a\n1. \u6b63\u5e38\u9759\u606f\u5fc3\u7387\u4e3a60-100\u6b21/\u5206\u949f\n2. \u89c4\u5f8b\u8fd0\u52a8\u53ef\u4ee5\u964d\u4f4e\u9759\u606f\u5fc3\u7387\n3. \u5982\u679c\u5fc3\u7387\u5f02\u5e38\uff08\u8fc7\u5feb/\u8fc7\u6162/\u4e0d\u89c4\u5219\uff09\uff0c\u8bf7\u53ca\u65f6\u5c31\u533b\n4. \u5efa\u8bae\u5b9a\u671f\u76d1\u6d4b\u5fc3\u7387\u53d8\u5316\u8d8b\u52bf';
+  if (lower.includes('心率') || lower.includes('心脏')) {
+    return '关于心率健康：\n1. 正常静息心率为60-100次/分钟\n2. 规律运动可以降低静息心率\n3. 如果心率异常（过快/过慢/不规则），请及时就医\n4. 建议定期监测心率变化趋势';
   }
 
-  if (lower.includes('\u8840\u538b')) {
-    return '\u5173\u4e8e\u8840\u538b\u7ba1\u7406\uff1a\n1. \u6b63\u5e38\u8840\u538b\u8303\u56f4\uff1a\u6536\u7f29\u538b90-140mmHg\uff0c\u8212\u5f20\u538b60-90mmHg\n2. \u5efa\u8bae\u4f4e\u76d0\u996e\u98df\uff0c\u6bcf\u65e5\u98df\u76d0\u6444\u5165\u4e0d\u8d85\u8fc76g\n3. \u4fdd\u6301\u9002\u91cf\u8fd0\u52a8\uff0c\u6bcf\u5468\u81f3\u5c11150\u5206\u949f\u4e2d\u7b49\u5f3a\u5ea6\u8fd0\u52a8\n4. \u5b9a\u671f\u76d1\u6d4b\u8840\u538b\uff0c\u8bb0\u5f55\u53d8\u5316\u8d8b\u52bf';
+  if (lower.includes('血压')) {
+    return '关于血压管理：\n1. 正常血压范围：收缩压90-140mmHg，舒张压60-90mmHg\n2. 建议低盐饮食，每日食盐摄入不超过6g\n3. 保持适量运动，每周至少150分钟中等强度运动\n4. 定期监测血压，记录变化趋势';
   }
 
-  if (lower.includes('\u75b2\u52b3') || lower.includes('\u7d2f') || lower.includes('\u4e4f\u529b')) {
-    return '\u5173\u4e8e\u75b2\u52b3\u7ba1\u7406\uff1a\n1. \u786e\u4fdd\u6bcf\u665a7-9\u5c0f\u65f6\u7684\u5145\u8db3\u7761\u7720\n2. \u5408\u7406\u5b89\u6392\u5de5\u4f5c\u4e0e\u4f11\u606f\u65f6\u95f4\n3. \u9002\u5ea6\u8fd0\u52a8\u53ef\u4ee5\u63d0\u5347\u7cbe\u529b\n4. \u5982\u679c\u6301\u7eed\u75b2\u52b3\uff0c\u5efa\u8bae\u68c0\u67e5\u662f\u5426\u6709\u8d2b\u8840\u3001\u7532\u72b6\u817a\u7b49\u95ee\u9898';
+  if (lower.includes('疲劳') || lower.includes('累') || lower.includes('乏力')) {
+    return '关于疲劳管理：\n1. 确保每晚7-9小时的充足睡眠\n2. 合理安排工作与休息时间\n3. 适度运动可以提升精力\n4. 如果持续疲劳，建议检查是否有贫血、甲状腺等问题';
   }
 
-  if (lower.includes('\u8fd0\u52a8') || lower.includes('\u953b\u70bc') || lower.includes('\u6b65\u6570')) {
-    return '\u5173\u4e8e\u8fd0\u52a8\u5efa\u8bae\uff1a\n1. \u6bcf\u5929\u5efa\u8bae\u6b65\u884c8000-10000\u6b65\n2. \u6bcf\u5468\u81f3\u5c11\u8fdb\u884c150\u5206\u949f\u4e2d\u7b49\u5f3a\u5ea6\u6709\u6c27\u8fd0\u52a8\n3. \u8fd0\u52a8\u524d\u505a\u597d\u70ed\u8eab\uff0c\u8fd0\u52a8\u540e\u6ce8\u610f\u62c9\u4f38\n4. \u6839\u636e\u8eab\u4f53\u72b6\u51b5\u9010\u6b65\u589e\u52a0\u8fd0\u52a8\u91cf';
+  if (lower.includes('运动') || lower.includes('锻炼') || lower.includes('步数')) {
+    return '关于运动建议：\n1. 每天建议步行8000-10000步\n2. 每周至少进行150分钟中等强度有氧运动\n3. 运动前做好热身，运动后注意拉伸\n4. 根据身体状况逐步增加运动量';
   }
 
-  if (lower.includes('\u8840\u6c27') || lower.includes('spo2')) {
-    return '\u5173\u4e8e\u8840\u6c27\u76d1\u6d4b\uff1a\n1. \u6b63\u5e38\u8840\u6c27\u9971\u548c\u5ea6\u5e94\u572895%\u4ee5\u4e0a\n2. \u5982\u679c\u8840\u6c27\u6301\u7eed\u4f4e\u4e8e94%\uff0c\u5efa\u8bae\u5c31\u533b\n3. \u7761\u7720\u65f6\u8840\u6c27\u4e0b\u964d\u53ef\u80fd\u4e0e\u7761\u7720\u547c\u5438\u6682\u505c\u6709\u5173\n4. \u5efa\u8bae\u5728\u5b89\u9759\u72b6\u6001\u4e0b\u6d4b\u91cf\u8840\u6c27';
+  if (lower.includes('血氧') || lower.includes('spo2')) {
+    return '关于血氧监测：\n1. 正常血氧饱和度应在95%以上\n2. 如果血氧持续低于94%，建议就医\n3. 睡眠时血氧下降可能与睡眠呼吸暂停有关\n4. 建议在安静状态下测量血氧';
   }
 
-  return '\u60a8\u597d\uff01\u6211\u662fVitaSleep\u5065\u5eb7\u52a9\u624b\uff0c\u53ef\u4ee5\u4e3a\u60a8\u63d0\u4f9b\u4ee5\u4e0b\u65b9\u9762\u7684\u5065\u5eb7\u5efa\u8bae\uff1a\n\u2022 \u7761\u7720\u7ba1\u7406\u4e0e\u6539\u5584\n\u2022 \u5fc3\u7387\u76d1\u6d4b\u4e0e\u5fc3\u810f\u5065\u5eb7\n\u2022 \u8840\u538b\u7ba1\u7406\n\u2022 \u75b2\u52b3\u6062\u590d\n\u2022 \u8fd0\u52a8\u5efa\u8bae\n\u2022 \u8840\u6c27\u76d1\u6d4b\n\n\u8bf7\u544a\u8bc9\u6211\u60a8\u60f3\u4e86\u89e3\u54ea\u65b9\u9762\u7684\u5185\u5bb9\uff1f';
+  return '您好！我是VitaSleep健康助手，可以为您提供以下方面的健康建议：\n• 睡眠管理与改善\n• 心率监测与心脏健康\n• 血压管理\n• 疲劳恢复\n• 运动建议\n• 血氧监测\n\n请告诉我您想了解哪方面的内容？';
 }
 
-chatRouter.post('/send', (req, res) => {
+function buildHealthContext(userId: string): string {
+  try {
+    const types = db.prepare(
+      "SELECT DISTINCT metric_type FROM health_metrics WHERE user_id = ?"
+    ).all(userId) as any[];
+
+    if (types.length === 0) return '';
+
+    const parts: string[] = ['当前用户的最新健康数据：'];
+    for (const { metric_type } of types) {
+      const row = db.prepare(
+        "SELECT value, computed_at FROM health_metrics WHERE user_id = ? AND metric_type = ? ORDER BY computed_at DESC LIMIT 1"
+      ).get(userId, metric_type) as any;
+
+      if (row) {
+        const value = JSON.parse(row.value);
+        const time = row.computed_at;
+        parts.push(`- ${metric_type}: ${JSON.stringify(value)} (更新时间: ${time})`);
+      }
+    }
+    return parts.join('\n');
+  } catch {
+    return '';
+  }
+}
+
+chatRouter.post('/send', async (req, res) => {
   const { user_id, content, agent_type } = req.body;
   const userId = user_id || 'test_user_001';
   const now = new Date().toISOString();
@@ -43,7 +89,46 @@ chatRouter.post('/send', (req, res) => {
       'INSERT INTO chat_history (user_id, role, content, agent_type, created_at) VALUES (?, ?, ?, ?, ?)'
     ).run(userId, 'user', content, agent_type || null, now);
 
-    const responseContent = generateHealthResponse(content);
+    let responseContent: string;
+
+    try {
+      const healthContext = buildHealthContext(userId);
+
+      const historyRows = db.prepare(
+        'SELECT role, content FROM chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
+      ).all(userId) as any[];
+
+      const messages: any[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+      ];
+
+      if (healthContext) {
+        messages.push({ role: 'system', content: healthContext });
+      }
+
+      const historyMessages = historyRows
+        .reverse()
+        .map((row: any) => ({
+          role: row.role as 'user' | 'assistant',
+          content: row.content,
+        }))
+        .filter((m: any) => m.role === 'user' || m.role === 'assistant');
+
+      messages.push(...historyMessages);
+
+      const completion = await client.chat.completions.create({
+        model: 'glm-4-flash',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+
+      responseContent = completion.choices[0]?.message?.content || generateHealthResponse(content);
+    } catch (llmError: any) {
+      console.error('[Chat] LLM error, falling back to rule-based:', llmError.message);
+      responseContent = generateHealthResponse(content);
+    }
+
     const result = db.prepare(
       'INSERT INTO chat_history (user_id, role, content, agent_type, created_at) VALUES (?, ?, ?, ?, ?)'
     ).run(userId, 'assistant', responseContent, 'vitasleep-agent', now);
