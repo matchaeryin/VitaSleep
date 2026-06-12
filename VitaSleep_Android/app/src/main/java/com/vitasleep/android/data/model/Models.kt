@@ -2,89 +2,81 @@ package com.vitasleep.android.data.model
 
 import com.google.gson.annotations.SerializedName
 
-// ─── 健康指标 ───
-
 data class HealthMetric(
-    val id: Int,
-    val userId: String,
-    val metricType: String,
-    val value: Any,
-    val computedAt: String,
+    val id: Int = 0,
+    val userId: String = "",
+    val metricType: String = "",
+    val value: Any? = null,
+    val computedAt: String = "",
     val validUntil: String? = null
 )
 
 data class HealthMetricsResponse(
-    val metrics: List<HealthMetric>,
-    val total: Int
+    val metrics: List<HealthMetric> = emptyList(),
+    val total: Int = 0
 )
 
-// ─── 日程 ───
-
 data class Schedule(
-    val id: Int,
-    val userId: String,
-    val title: String,
-    val eventType: String,
-    val startTime: String,
-    val endTime: String,
-    val source: String,
-    val status: String,
-    val createdAt: String,
-    val updatedAt: String
+    val id: Int = 0,
+    val userId: String = "",
+    val title: String = "",
+    val eventType: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val source: String = "",
+    val status: String = "",
+    val createdAt: String = "",
+    val updatedAt: String = ""
 )
 
 data class CreateScheduleRequest(
-    val userId: String,
-    val title: String,
+    val userId: String = "",
+    val title: String = "",
     val eventType: String = "flexible",
-    val startTime: String,
-    val endTime: String
+    val startTime: String = "",
+    val endTime: String = ""
 )
 
-// ─── 聊天 ───
-
 data class ChatMessage(
-    val id: Int? = null,
-    val userId: String,
-    val role: String,
-    val content: String,
-    val agentType: String? = null,
-    val createdAt: String? = null
+    val id: Int = 0,
+    val userId: String = "",
+    val role: String = "",
+    val content: String = "",
+    val agentType: String = "",
+    val createdAt: String = ""
 )
 
 data class SendMessageRequest(
-    val userId: String,
-    val content: String,
+    val userId: String = "",
+    val content: String = "",
     val agentType: String = "vitasleep-agent"
 )
 
-// ─── Veepoo 设备数据 ───
-
 data class VeepooOriginDataRequest(
-    val userId: String,
+    val userId: String = "",
     val deviceId: String? = null,
     val deviceModel: String? = null,
-    val records: List<VeepooOriginRecord>,
+    val records: List<VeepooOriginRecord> = emptyList(),
     val dataDate: String? = null
 )
 
 data class VeepooOriginRecord(
-    val timestamp: String,
-    val heartRate: Int,
+    val timestamp: String = "",
+    val heartRate: Int = 0,
     val heartRateArray: List<Int>? = null,
-    val systolic: Int,
-    val diastolic: Int,
+    val systolic: Int = 0,
+    val diastolic: Int = 0,
     val steps: Int = 0,
     val spo2: Int? = null
 )
 
 data class VeepooSleepDataRequest(
-    val userId: String,
+    val userId: String = "",
     val deviceId: String? = null,
-    val sleepDate: String,
-    val sleepStart: String,
-    val sleepEnd: String,
-    val totalSleepMin: Int,
+    val sleepDate: String = "",
+    val sleepStart: String = "",
+    val sleepEnd: String = "",
+    val totalSleepMin: Int = 0,
     val deepSleepMin: Int = 0,
     val lightSleepMin: Int = 0,
     val remSleepMin: Int = 0,
@@ -97,8 +89,8 @@ data class VeepooSleepDataRequest(
 )
 
 data class VeepooUploadResponse(
-    val status: String,
-    val message: String,
+    val status: String = "",
+    val message: String = "",
     val recordsProcessed: Int = 0,
     val metricIds: List<Int> = emptyList(),
     val errors: List<String> = emptyList()
