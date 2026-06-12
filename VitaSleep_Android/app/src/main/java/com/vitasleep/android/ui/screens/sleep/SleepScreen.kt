@@ -1,6 +1,5 @@
 package com.vitasleep.android.ui.screens.sleep
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -11,19 +10,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
+
+private val CardShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun SleepScreen(viewModel: SleepViewModel = hiltViewModel()) {
@@ -40,16 +35,16 @@ fun SleepScreen(viewModel: SleepViewModel = hiltViewModel()) {
     ) {
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "\u7761\u7720\u5206\u6790",
+            "睡眠分析",
             fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = TextPrimary
         )
         Spacer(modifier = Modifier.height(20.dp))
 
         if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = IceBlue)
+            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = IceBlue, strokeWidth = 2.dp)
             }
         } else if (uiState.error != null && uiState.totalSleepHours == null) {
             SleepEmptyState(error = uiState.error) {
@@ -79,8 +74,8 @@ private fun GlassCard(
 ) {
     Box(
         modifier = modifier
-            .background(GlassBg, RoundedCornerShape(28.dp))
-            .border(1.dp, GlassBorder, RoundedCornerShape(28.dp))
+            .background(GlassBg, CardShape)
+            .border(1.dp, GlassBorder, CardShape)
     ) {
         content()
     }
@@ -99,36 +94,37 @@ private fun SleepEmptyState(error: String?, onRetry: () -> Unit) {
                 modifier = Modifier
                     .size(72.dp)
                     .background(
-                        RemSleepColor.copy(alpha = 0.1f),
+                        RemSleepColor.copy(alpha = 0.08f),
                         RoundedCornerShape(24.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Nightlight, null,
-                    tint = RemSleepColor,
-                    modifier = Modifier.size(36.dp)
+                    tint = RemSleepColor.copy(alpha = 0.6f),
+                    modifier = Modifier.size(32.dp)
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "\u6682\u65e0\u7761\u7720\u6570\u636e",
+                "暂无睡眠数据",
                 color = TextPrimary,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                error ?: "\u8bbe\u5907\u5c1a\u672a\u8bb0\u5f55\u7761\u7720\u4fe1\u606f",
+                error ?: "设备尚未记录睡眠信息",
                 color = TextSecondary,
                 fontSize = 13.sp
             )
             Spacer(modifier = Modifier.height(20.dp))
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = IceBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = IceBlue),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Text("\u5237\u65b0", color = OnPrimary)
+                Text("刷新", color = OnPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -144,56 +140,37 @@ private fun SleepTotalCard(hours: String?, qualityScore: Float?) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "\u6628\u665a\u7761\u7720",
+                "昨晚睡眠",
                 color = TextSecondary,
                 fontSize = 14.sp
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier.drawBehind {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                RemSleepColor.copy(alpha = 0.15f),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = size.minDimension
-                        )
-                    )
-                },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    hours ?: "--",
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "\u5c0f\u65f6",
+                hours ?: "--",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                "小时",
                 color = TextDim,
-                fontSize = 14.sp
+                fontSize = 13.sp
             )
             qualityScore?.let { score ->
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 val scoreColor = when {
                     score >= 80 -> MintGreen
                     score >= 60 -> Amber
                     else -> RoseRed
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "\u8d28\u91cf\u8bc4\u5206 ",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("质量评分", color = TextSecondary, fontSize = 13.sp)
                     Text(
                         "${score.toInt()}",
                         color = scoreColor,
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -215,42 +192,26 @@ private fun SleepStagesCard(
                 .padding(20.dp)
         ) {
             Text(
-                "\u7761\u7720\u9636\u6bb5\u5206\u5e03",
+                "睡眠阶段分布",
                 color = TextPrimary,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            SleepStageBar(
-                "\u6df1\u7761",
-                deepPct,
-                DeepSleepColor
-            )
+            SleepStageRow("深睡", deepPct, DeepSleepColor)
             Spacer(modifier = Modifier.height(14.dp))
-            SleepStageBar(
-                "\u6d45\u7761",
-                lightPct,
-                LightSleepColor
-            )
+            SleepStageRow("浅睡", lightPct, LightSleepColor)
             Spacer(modifier = Modifier.height(14.dp))
-            SleepStageBar(
-                "REM",
-                remPct,
-                RemSleepColor
-            )
+            SleepStageRow("REM", remPct, RemSleepColor)
             Spacer(modifier = Modifier.height(14.dp))
-            SleepStageBar(
-                "\u6e05\u9192",
-                awakePct,
-                AwakeColor
-            )
+            SleepStageRow("清醒", awakePct, AwakeColor)
         }
     }
 }
 
 @Composable
-private fun SleepStageBar(
+private fun SleepStageRow(
     name: String,
     pct: Float,
     color: Color
@@ -260,30 +221,26 @@ private fun SleepStageBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                name,
-                color = TextSecondary,
-                fontSize = 13.sp
-            )
+            Text(name, color = TextSecondary, fontSize = 13.sp)
             Text(
                 "${pct.toInt()}%",
                 color = color,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .background(TextDim.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                .height(6.dp)
+                .background(TextDim.copy(alpha = 0.08f), RoundedCornerShape(3.dp))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(if (pct > 0f) pct / 100f else 0f)
-                    .background(color, RoundedCornerShape(4.dp))
+                    .background(color, RoundedCornerShape(3.dp))
             )
         }
     }
