@@ -20,7 +20,7 @@ class ScheduleRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("获取日程失败", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
@@ -33,7 +33,7 @@ class ScheduleRepository @Inject constructor(
             } else {
                 ApiResult.Error("创建失败", response.code())
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ApiResult.Error(e.message ?: "网络错误")
         }
     }
@@ -46,7 +46,7 @@ class ScheduleRepository @Inject constructor(
             } else {
                 ApiResult.Error("删除失败", response.code())
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ApiResult.Error(e.message ?: "网络错误")
         }
     }
