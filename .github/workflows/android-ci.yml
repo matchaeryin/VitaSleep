@@ -5,7 +5,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -21,15 +20,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Gradle 8.7
-        run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip -O gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip -d /opt/
-          echo "/opt/gradle-8.7/bin" >> $GITHUB_PATH
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        working-directory: VitaSleep_Android
 
       - name: Build Debug APK
-        working-directory: ./VitaSleep_Android
-        run: gradle assembleDebug --no-daemon --no-build-cache
+        run: ./gradlew assembleDebug
+        working-directory: VitaSleep_Android
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
