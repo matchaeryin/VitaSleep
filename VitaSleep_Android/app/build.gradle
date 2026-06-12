@@ -22,21 +22,19 @@ android {
             useSupportLibrary true
         }
 
-        // 后端服务地址（从项目根目录 gradle.properties 读取）
-        // 修改 gradle.properties 中的 BACKEND_BASE_URL 后重新编译即可生效
-        def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://YOUR_SERVER_IP:8000"
+        def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://36.103.199.229:8888"
         buildConfigField "String", "BACKEND_BASE_URL", "\"${backendUrl}\""
     }
 
     buildTypes {
         debug {
-            def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://10.0.2.2:8000"
+            def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://36.103.199.229:8888"
             buildConfigField "String", "BACKEND_BASE_URL", "\"${backendUrl}\""
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://YOUR_SERVER_IP:8000"
+            def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://36.103.199.229:8888"
             buildConfigField "String", "BACKEND_BASE_URL", "\"${backendUrl}\""
         }
     }
