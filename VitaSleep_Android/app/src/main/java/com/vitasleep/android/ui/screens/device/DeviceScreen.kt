@@ -83,14 +83,18 @@ fun DeviceScreen(
                     onSyncAll = { viewModel.syncAllData() }
                 )
             }
-            is ConnectionState.Connecting -> {
+            is ConnectionState.Connecting,
+            is ConnectionState.Confirming -> {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = Primary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("连接中…", color = OnSurface)
+                    Text(
+                        if (connectionState is ConnectionState.Confirming) "验证设备中…" else "连接中…",
+                        color = OnSurface
+                    )
                 }
             }
         }
@@ -152,6 +156,7 @@ fun ConnectionStatusCard(
                         text = when (connectionState) {
                             is ConnectionState.Connected -> "已连接"
                             is ConnectionState.Connecting -> "连接中…"
+                            is ConnectionState.Confirming -> "验证设备中…"
                             is ConnectionState.Error -> "连接失败"
                             is ConnectionState.Disconnected -> "未连接"
                         },
