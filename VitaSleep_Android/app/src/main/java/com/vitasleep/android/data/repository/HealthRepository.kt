@@ -16,7 +16,9 @@ class HealthRepository @Inject constructor(
         try {
             val response = api.getLatestMetrics(userId)
             if (response.isSuccessful) {
-                emit(ApiResult.Success(response.body() ?: emptyMap()))
+                val metricsList = response.body() ?: emptyList()
+                val metricsMap = metricsList.associateBy { it.metricType }
+                emit(ApiResult.Success(metricsMap))
             } else {
                 emit(ApiResult.Error("获取数据失败: ${response.code()}", response.code()))
             }
