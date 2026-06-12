@@ -25,7 +25,12 @@ fun SleepScreen(viewModel: SleepViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val userId = VeepooManager.DEFAULT_USER_ID
 
-    LaunchedEffect(userId) { viewModel.loadSleepData(userId) }
+    LaunchedEffect(userId) {
+        try {
+            viewModel.loadSleepData(userId)
+        } catch (e: Exception) {
+        }
+    }
 
     Column(
         modifier = Modifier
