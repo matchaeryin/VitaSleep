@@ -22,7 +22,7 @@ class HealthRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("获取数据失败: ${response.code()}", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
@@ -36,7 +36,7 @@ class HealthRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("获取睡眠数据失败: ${response.code()}", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
