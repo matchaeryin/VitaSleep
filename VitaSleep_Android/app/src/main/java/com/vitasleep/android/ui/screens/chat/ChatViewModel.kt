@@ -26,15 +26,19 @@ class ChatViewModel @Inject constructor(
 
     fun loadHistory(userId: String) {
         viewModelScope.launch {
-            repository.getChatHistory(userId).collect { result ->
-                when (result) {
-                    is ApiResult.Success -> {
-                        val sorted = result.data.sortedBy { it.createdAt ?: "" }
-                        _uiState.value = _uiState.value.copy(messages = sorted)
+            try {
+                repository.getChatHistory(userId).collect { result ->
+                    when (result) {
+                        is ApiResult.Success -> {
+                            val sorted = result.data.sortedBy { it.createdAt ?: "" }
+                            _uiState.value = _uiState.value.copy(messages = sorted)
+                        }
+                        is ApiResult.Error -> {}
+                        ApiResult.Loading -> {}
                     }
-                    is ApiResult.Error -> {}
-                    ApiResult.Loading -> {}
                 }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
