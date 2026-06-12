@@ -33,8 +33,11 @@ fun HealthScreen(
     val userId = VeepooManager.DEFAULT_USER_ID
 
     LaunchedEffect(Unit) {
-        viewModel.loadLatestMetrics(userId)
-        viewModel.startSseListening(userId)
+        try {
+            viewModel.loadLatestMetrics(userId)
+            viewModel.startSseListening(userId)
+        } catch (e: Exception) {
+        }
     }
 
     DisposableEffect(Unit) {
