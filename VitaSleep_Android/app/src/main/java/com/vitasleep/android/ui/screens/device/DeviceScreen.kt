@@ -26,7 +26,8 @@ import com.vitasleep.android.veepoo.ScannedDevice
 @Composable
 fun DeviceScreen(
     viewModel: DeviceViewModel = hiltViewModel(),
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit = {},
+    onRequestEnableBluetooth: () -> Unit = {}
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val scannedDevices by viewModel.scannedDevices.collectAsState()
@@ -80,7 +81,7 @@ fun DeviceScreen(
                     onSyncAll = { viewModel.syncAllData() }
                 )
             }
-            ConnectionState.Connecting -> {
+            is ConnectionState.Connecting -> {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -150,7 +151,7 @@ fun ConnectionStatusCard(
                             is ConnectionState.Connected -> "已连接"
                             is ConnectionState.Connecting -> "连接中…"
                             is ConnectionState.Error -> "连接失败"
-                            ConnectionState.Disconnected -> "未连接"
+                            is ConnectionState.Disconnected -> "未连接"
                         },
                         fontWeight = FontWeight.Medium,
                         color = OnSurface
