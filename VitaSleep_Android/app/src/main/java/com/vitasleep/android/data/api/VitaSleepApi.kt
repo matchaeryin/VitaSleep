@@ -6,6 +6,11 @@ import retrofit2.http.*
 
 interface VitaSleepApi {
 
+    @GET("api/health/latest")
+    suspend fun getLatestMetrics(
+        @Query("user_id") userId: String
+    ): Response<Map<String, HealthMetric>>
+
     @GET("api/health/metrics")
     suspend fun getHealthMetrics(
         @Query("user_id") userId: String,

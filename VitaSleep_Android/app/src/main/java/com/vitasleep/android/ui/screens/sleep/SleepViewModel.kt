@@ -41,7 +41,8 @@ class SleepViewModel @Inject constructor(private val repository: HealthRepositor
                             if (value is Map<*, *>) {
                                 @Suppress("UNCHECKED_CAST")
                                 val map = value as Map<String, Any>
-                                val sleepHours = (map["sleep_hours"] as? Number)?.toFloat()
+                                val totalSleepMin = (map["total_sleep_min"] as? Number)?.toInt()
+                                val sleepHours = totalSleepMin?.let { String.format("%.1f", it / 60.0) }
                                 val deepPct = (map["deep_pct"] as? Number)?.toFloat() ?: 0f
                                 val lightPct = (map["light_pct"] as? Number)?.toFloat() ?: 0f
                                 val remPct = (map["rem_pct"] as? Number)?.toFloat() ?: 0f
@@ -49,7 +50,7 @@ class SleepViewModel @Inject constructor(private val repository: HealthRepositor
                                 val qualityScore = (map["quality_score"] as? Number)?.toFloat()
                                 _uiState.value = _uiState.value.copy(
                                     isLoading = false,
-                                    totalSleepHours = sleepHours?.let { String.format("%.1f", it) },
+                                    totalSleepHours = sleepHours,
                                     deepPct = deepPct,
                                     lightPct = lightPct,
                                     remPct = remPct,
