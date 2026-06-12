@@ -1,11 +1,11 @@
 package com.vitasleep.android.ui.screens.chat
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,9 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,14 +22,16 @@ import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
+fun ChatScreen(
+    viewModel: ChatViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val userId = VeepooManager.DEFAULT_USER_ID
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     LaunchedEffect(userId) {
-        viewModel.loadChatHistory(userId)
+        viewModel.loadHistory(userId)
     }
 
     LaunchedEffect(uiState.messages.size) {
@@ -43,62 +43,33 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DeepBg)
-            .padding(horizontal = 16.dp)
+            .padding(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
+        // 标题
         Text(
-            "\u5065\u5eb7\u52a9\u624b",
-            fontSize = 26.sp,
+            text = "健康助手",
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = OnBackground
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "\u57fa\u4e8e AI \u7684\u667a\u80fd\u5065\u5eb7\u54a8\u8be2",
-            fontSize = 13.sp,
-            color = TextSecondary
+            "基于 GLM-4 大模型，帮你分析健康数据、制定作息计划",
+            fontSize = 12.sp,
+            color = OnSurfaceVariant
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box(
+        // 消息列表
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Surface),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(GlassBg, RoundedCornerShape(24.dp))
-                .border(1.dp, GlassBorder, RoundedCornerShape(24.dp))
         ) {
-            if (uiState.messages.isEmpty()) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(IceBlueGlow, RoundedCornerShape(20.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.SmartToy, null,
-                            tint = IceBlue,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "\u4f60\u597d\uff01\u6211\u662f VitaSleep \u5065\u5eb7\u52a9\u624b",
-                        color = TextPrimary,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "\u53ef\u4ee5\u8be2\u95ee\u60a8\u7684\u5065\u5eb7\u6570\u636e\u3001\u7761\u7720\u8d28\u91cf\u3001\u8fd0\u52a8\u5efa\u8bae\u7b49\u95ee\u9898",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
+            if (uiState.isLoading && uiState.messages.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Primary)
                 }
             } else {
                 LazyColumn(
@@ -106,138 +77,160 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (uiState.messages.isEmpty()) {
+                        item {
+                            WelcomeMessage()
+                        }
+                    }
                     items(uiState.messages) { message ->
-                        GlassChatBubble(
+                        ChatBubble(
                             role = message.role,
-                            content = message.content
+                            content = message.content,
+                            isLoading = false
                         )
                     }
-                    if (uiState.isLoading) {
+                    if (uiState.isLoading && uiState.messages.isNotEmpty()) {
                         item {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(8.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = IceBlue
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "\u601d\u8003\u4e2d\u2026",
-                                    color = TextSecondary,
-                                    fontSize = 13.sp
-                                )
-                            }
+                            ChatBubble(role = "assistant", content = "", isLoading = true)
                         }
                     }
                 }
             }
         }
 
-        if (uiState.error != null && uiState.messages.isEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                uiState.error!!,
-                color = RoseRed,
-                fontSize = 12.sp
-            )
-        }
-
         Spacer(modifier = Modifier.height(12.dp))
+
+        // 输入框
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GlassBg, RoundedCornerShape(22.dp))
-                .border(1.dp, GlassBorder, RoundedCornerShape(22.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = inputText,
                 onValueChange = { inputText = it },
-                placeholder = {
-                    Text(
-                        "\u53d1\u9001\u6d88\u606f\u2026",
-                        color = TextDim
-                    )
-                },
+                placeholder = { Text("询问健康建议…") },
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = IceBlue
+                    focusedBorderColor = Primary,
+                    unfocusedBorderColor = SurfaceVariant,
+                    focusedContainerColor = Surface,
+                    unfocusedContainerColor = Surface
                 ),
+                shape = RoundedCornerShape(24.dp),
                 maxLines = 3
             )
+            Spacer(modifier = Modifier.width(8.dp))
             IconButton(
                 onClick = {
-                    if (inputText.isNotBlank()) {
+                    if (inputText.isNotBlank() && !uiState.isLoading) {
                         viewModel.sendMessage(userId, inputText)
                         inputText = ""
                     }
                 },
-                enabled = inputText.isNotBlank() && !uiState.isLoading
+                enabled = inputText.isNotBlank() && !uiState.isLoading,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (inputText.isNotBlank()) Primary else SurfaceVariant)
             ) {
                 Icon(
-                    Icons.Default.Send, null,
-                    tint = if (inputText.isNotBlank()) IceBlue else TextDim
+                    Icons.Default.Send,
+                    contentDescription = "发送",
+                    tint = OnPrimary
                 )
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
 @Composable
-private fun GlassChatBubble(role: String, content: String) {
-    val isUser = role == "user"
+fun WelcomeMessage() {
     Column(
-        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .then(
-                    if (isUser) {
-                        Modifier
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(IceBlue.copy(alpha = 0.25f), IceBlue.copy(alpha = 0.15f))
-                                ),
-                                RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
-                            )
-                            .border(
-                                1.dp,
-                                IceBlue.copy(alpha = 0.3f),
-                                RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
-                            )
-                    } else {
-                        Modifier
-                            .background(
-                                GlassBgElevated,
-                                RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
-                            )
-                            .border(
-                                1.dp,
-                                GlassBorder,
-                                RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
-                            )
-                    }
+        Spacer(modifier = Modifier.height(24.dp))
+        Icon(
+            Icons.Default.SmartToy,
+            contentDescription = null,
+            tint = Primary,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "你好！我是 VitaSleep 健康助手",
+            fontWeight = FontWeight.Medium,
+            color = OnSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "你可以问我：\n" +
+                    "• 昨晚睡眠质量如何？\n" +
+                    "• 今天身体电量怎么样？\n" +
+                    "• 建议一个适合我的作息计划",
+            color = OnSurfaceVariant,
+            fontSize = 13.sp,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+fun ChatBubble(
+    role: String,
+    content: String,
+    isLoading: Boolean
+) {
+    val isUser = role == "user"
+    val bgColor = if (isUser) Primary else SurfaceVariant
+    val alignment = if (isUser) Alignment.End else Alignment.Start
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = alignment
+    ) {
+        if (isLoading) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = OnSurfaceVariant
                 )
-        ) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("助手正在思考…", color = OnSurfaceVariant, fontSize = 12.sp)
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomStart = if (isUser) 16.dp else 4.dp,
+                            bottomEnd = if (isUser) 4.dp else 16.dp
+                        )
+                    )
+                    .background(bgColor)
+                    .padding(12.dp)
+                    .widthIn(max = 280.dp)
+            ) {
+                Text(
+                    content,
+                    color = if (isUser) OnPrimary else OnSurface,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
             Text(
-                content,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                color = if (isUser) TextPrimary else TextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
+                if (isUser) "你" else "助手",
+                fontSize = 10.sp,
+                color = OnSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
             )
         }
     }
