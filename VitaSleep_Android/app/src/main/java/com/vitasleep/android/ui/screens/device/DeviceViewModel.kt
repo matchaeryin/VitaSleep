@@ -171,7 +171,7 @@ class DeviceViewModel @Inject constructor(
                             }
                         }
                     }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _syncState.value = SyncState.Error(e.message ?: "同步失败")
             }
         }
