@@ -30,7 +30,7 @@ class ChatRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("发送失败", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
@@ -44,7 +44,7 @@ class ChatRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("获取历史失败", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
