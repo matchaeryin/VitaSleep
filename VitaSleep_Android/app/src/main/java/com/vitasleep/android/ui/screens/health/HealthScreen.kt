@@ -1,20 +1,14 @@
 package com.vitasleep.android.ui.screens.health
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,206 +25,384 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
 
-private val CardShape = RoundedCornerShape(24.dp)
-private val IconBoxShape = RoundedCornerShape(12.dp)
-
 @Composable
-fun HealthScreen(viewModel: HealthViewModel = hiltViewModel()) {
+fun HealthScreen(
+    viewModel: HealthViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val userId = VeepooManager.DEFAULT_USER_ID
 
-    LaunchedEffect(userId) {
+    LaunchedEffect(Unit) {
         viewModel.loadLatestMetrics(userId)
+        viewModel.startSseListening(userId)
     }
 
-    val scrollState = rememberScrollState()
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopSseListening()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DeepBg)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            "身体状态",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (uiState.isLoading && uiState.battery == null) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = IceBlue, strokeWidth = 2.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "身体状态",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = OnBackground
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (uiState.isSseConnected) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(MintGreen, shape = CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("实时同步", fontSize = 11.sp, color = MintGreen)
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(TextDim, shape = CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("离线", fontSize = 11.sp, color = TextDim)
+                    }
+                }
             }
-        } else if (uiState.battery == null && uiState.heartRate == null && uiState.steps == null) {
-            EmptyHealthState()
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                uiState.battery?.let { BatteryRingCard(it) }
-                uiState.steps?.let { StepsCard(it) }
-                uiState.heartRate?.let { bpm ->
-                    MetricCard(
-                        title = "心率",
-                        value = "$bpm",
-                        unit = "bpm",
-                        accentColor = RoseRed
+        }
+
+        when {
+            uiState.isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = IceBlue)
+                }
+            }
+            uiState.error != null -> {
+                GlassCard {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.CloudOff,
+                            contentDescription = null,
+                            tint = RoseRed,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("无法连接到服务器", color = TextPrimary)
+                        Text(uiState.error ?: "", color = TextDim, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { viewModel.loadLatestMetrics(userId) },
+                            colors = ButtonDefaults.buttonColors(containerColor = IceBlue)
+                        ) {
+                            Text("重试", color = TextDark)
+                        }
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    item {
+                        uiState.battery?.let { BatteryRingCard(level = it) }
+                    }
+
+                    item {
+                        uiState.cardioScore?.let { score ->
+                            CardioIndexCard(
+                                score = score,
+                                level = uiState.cardioLevel ?: ""
+                            )
+                        }
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            uiState.heartRate?.let {
+                                MetricCard(
+                                    title = "心率",
+                                    value = "$it",
+                                    unit = "bpm",
+                                    icon = Icons.Default.Favorite,
+                                    color = RoseRed,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            uiState.bloodPressure?.let { bp ->
+                                MetricCard(
+                                    title = "血压",
+                                    value = bp,
+                                    unit = "mmHg",
+                                    icon = Icons.Default.Speed,
+                                    color = SkyBlue,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        uiState.hrv?.let { hrv ->
+                            MetricCard(
+                                title = "HRV 心率变异性",
+                                value = hrv,
+                                unit = "",
+                                icon = Icons.Default.ShowChart,
+                                color = IceBlue,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassCard(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = GlassBorder,
+                shape = RoundedCornerShape(24.dp)
+            ),
+        shape = RoundedCornerShape(24.dp),
+        color = Surface.copy(alpha = 0.6f)
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun BatteryRingCard(level: Int) {
+    val ringColor = when {
+        level >= 70 -> MintGreen
+        level >= 40 -> IceBlue
+        else -> RoseRed
+    }
+    val status = when {
+        level >= 80 -> "充沛"
+        level >= 60 -> "正常"
+        level >= 40 -> "偏低"
+        else -> "需要恢复"
+    }
+    val desc = when {
+        level >= 70 -> "精力充沛，适合重要事务"
+        level >= 40 -> "电量适中，注意休息"
+        else -> "电量偏低，建议恢复"
+    }
+
+    GlassCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(108.dp)
+            ) {
+                Canvas(modifier = Modifier.size(108.dp)) {
+                    val strokeWidth = 10.dp.toPx()
+                    val radius = (size.minDimension - strokeWidth) / 2
+                    val topLeft = Offset(
+                        (size.width - radius * 2) / 2,
+                        (size.height - radius * 2) / 2
+                    )
+
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.06f),
+                        radius = radius,
+                        center = center,
+                        style = Stroke(width = strokeWidth)
+                    )
+
+                    val sweepAngle = (level / 100f) * 360f
+                    drawArc(
+                        color = ringColor,
+                        startAngle = -90f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                 }
-                uiState.bloodPressure?.let { bp ->
-                    BloodPressureCard(bp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "$level",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ringColor
+                    )
+                    Text(
+                        text = "%",
+                        fontSize = 11.sp,
+                        color = TextDim
+                    )
                 }
-                uiState.cardioIndex?.let { idx ->
-                    CardioCard(idx, uiState.cardioRisk)
+            }
+
+            Spacer(modifier = Modifier.width(20.dp))
+
+            Column {
+                Text(
+                    text = "身体电量",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "状态：",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = status,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ringColor
+                    )
                 }
-                uiState.hrv?.let { hrvStr ->
-                    HrvCard(hrvStr)
-                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = desc,
+                    fontSize = 12.sp,
+                    color = TextDim,
+                    lineHeight = 18.sp
+                )
             }
         }
     }
 }
 
 @Composable
-private fun EmptyHealthState() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Spacer(modifier = Modifier.height(80.dp))
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(IceBlue.copy(alpha = 0.08f), RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.FavoriteBorder,
-                contentDescription = null,
-                tint = IceBlue.copy(alpha = 0.6f),
-                modifier = Modifier.size(32.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("暂无健康数据", color = TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("连接设备并读取数据后，这里将显示你的身体状态", color = TextDim, fontSize = 13.sp)
-    }
-}
-
-@Composable
-private fun GlassCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(GlassBg, CardShape)
-            .border(1.dp, GlassBorder, CardShape)
-            .padding(20.dp),
-        content = content
-    )
-}
-
-@Composable
-private fun BatteryRingCard(battery: Int) {
-    val animatedProgress = animateFloatAsState(
-        targetValue = battery / 100f,
-        animationSpec = tween(800, easing = LinearEasing),
-        label = "battery"
-    ).value
-
-    val color = when {
-        battery >= 60 -> MintGreen
-        battery >= 20 -> Amber
+private fun CardioIndexCard(score: Int, level: String) {
+    val accentColor = when {
+        score >= 80 -> MintGreen
+        score >= 60 -> IceBlue
         else -> RoseRed
     }
 
     GlassCard {
-        Text("电池电量", color = TextSecondary, fontSize = 13.sp)
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Canvas(modifier = Modifier.size(88.dp)) {
-                    val strokeWidth = 6.dp.toPx()
-                    drawArc(
-                        color = TextDim.copy(alpha = 0.1f),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                    )
-                    drawArc(
-                        color = color,
-                        startAngle = -90f,
-                        sweepAngle = 360f * animatedProgress,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                accentColor.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(16.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Favorite,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "心血管健康指数",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = level,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "$battery",
-                        color = TextPrimary,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text("%", color = TextDim, fontSize = 11.sp)
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "$score",
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                        Text(
+                            text = "/100",
+                            fontSize = 14.sp,
+                            color = TextDim,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
                 }
             }
-            Column {
-                Text(
-                    when {
-                        battery >= 60 -> "电量充足"
-                        battery >= 20 -> "电量一般"
-                        else -> "电量不足"
-                    },
-                    color = color,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun StepsCard(steps: Int) {
-    GlassCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(MintGreen.copy(alpha = 0.1f), IconBoxShape),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(3.dp))
             ) {
-                Icon(
-                    Icons.Filled.DirectionsWalk,
-                    contentDescription = null,
-                    tint = MintGreen,
-                    modifier = Modifier.size(22.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(score / 100f)
+                        .background(accentColor, RoundedCornerShape(3.dp))
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("今日步数", color = TextSecondary, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("$steps", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("风险 <60", fontSize = 11.sp, color = TextDim)
+                Text("良好 60-80", fontSize = 11.sp, color = TextDim)
+                Text("优秀 ≥80", fontSize = 11.sp, color = TextDim)
             }
-            Text("步", color = TextDim, fontSize = 13.sp)
         }
     }
 }
@@ -240,175 +412,48 @@ private fun MetricCard(
     title: String,
     value: String,
     unit: String,
-    accentColor: Color
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
 ) {
     GlassCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = modifier.padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(accentColor.copy(alpha = 0.1f), IconBoxShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = TextSecondary, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(value, color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                    Text(unit, color = TextDim, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BloodPressureCard(bp: String) {
-    val parts = bp.split("/")
-    val systolic = parts.getOrNull(0)?.toIntOrNull() ?: 120
-    val diastolic = parts.getOrNull(1)?.toIntOrNull() ?: 80
-
-    val statusColor = when {
-        systolic > 140 || diastolic > 90 -> RoseRed
-        systolic > 130 || diastolic > 85 -> Amber
-        else -> MintGreen
-    }
-
-    val statusText = when {
-        systolic > 140 || diastolic > 90 -> "偏高"
-        systolic > 130 || diastolic > 85 -> "正常偏高"
-        else -> "正常"
-    }
-
-    GlassCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(statusColor.copy(alpha = 0.1f), IconBoxShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = statusColor,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("血压", color = TextSecondary, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("$systolic", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                    Text("/", color = TextDim, fontSize = 18.sp, modifier = Modifier.padding(bottom = 2.dp))
-                    Text("$diastolic", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                    Text("mmHg", color = TextDim, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(modifier = Modifier.size(6.dp).background(statusColor, CircleShape))
-                Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-                    .height(3.dp)
-                    .background(TextDim.copy(alpha = 0.1f), RoundedCornerShape(2.dp))
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth((systolic.toFloat() / 180f).coerceIn(0f, 1f))
-                        .background(statusColor, RoundedCornerShape(2.dp))
+                        .size(32.dp)
+                        .background(color.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, color = TextSecondary, fontSize = 13.sp)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = value,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CardioCard(cardioIndex: String, cardioRisk: String?) {
-    val value = cardioIndex.toDoubleOrNull() ?: 0.0
-    val levelColor = when {
-        value >= 4 -> RoseRed
-        value >= 2 -> Amber
-        else -> MintGreen
-    }
-    val level = when {
-        value >= 4 -> "高强度"
-        value >= 2 -> "中等"
-        else -> "低强度"
-    }
-
-    GlassCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(levelColor.copy(alpha = 0.1f), IconBoxShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Favorite, contentDescription = null, tint = levelColor, modifier = Modifier.size(20.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("有氧运动", color = TextSecondary, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(cardioIndex, color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                    Text(level, color = levelColor, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
+                if (unit.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = unit,
+                        fontSize = 12.sp,
+                        color = TextDim,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
                 }
-                cardioRisk?.let { risk ->
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(risk, color = TextDim, fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HrvCard(hrvStr: String) {
-    GlassCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(IceBlue.copy(alpha = 0.1f), IconBoxShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Favorite, contentDescription = null, tint = IceBlue, modifier = Modifier.size(20.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("心率变异性", color = TextSecondary, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(hrvStr, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

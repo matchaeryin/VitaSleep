@@ -1,9 +1,9 @@
 package com.vitasleep.android.ui.screens.device
 
-import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vitasleep.android.data.model.VeepooOriginRecord
 import com.vitasleep.android.data.repository.ApiResult
 import com.vitasleep.android.data.repository.VeepooRepository
 import com.vitasleep.android.veepoo.ConnectionState
@@ -13,21 +13,22 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
 class DeviceViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ApplicationContext context: Context,
     private val veepooRepository: VeepooRepository
 ) : ViewModel() {
 
     private val veepooManager = VeepooManager.getInstance(context)
 
+    // UI 状态
     val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
-    val isScanning = veepooManager.scanning
-    val hasBluetooth = veepooManager.hasBluetooth()
+    val latestOriginData = veepooManager.latestOriginData
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState
@@ -35,112 +36,160 @@ class DeviceViewModel @Inject constructor(
     private val _uploadResult = MutableStateFlow<String?>(null)
     val uploadResult: StateFlow<String?> = _uploadResult
 
-    @SuppressLint("MissingPermission")
+    // ─── 扫描 ───
+
     fun startScan() {
-        if (!veepooManager.hasBluetooth()) {
-            println("[DeviceViewModel] bluetooth not enabled, cannot scan")
-            return
-        }
         veepooManager.startScan()
     }
 
-    fun stopScan() { veepooManager.stopScan() }
-    fun connect(device: ScannedDevice) { veepooManager.connectDevice(device.mac) }
-    fun disconnect() { veepooManager.disconnect() }
-    fun readBattery() { veepooManager.readBattery() }
+    fun stopScan() {
+        veepooManager.stopScan()
+    }
+
+    // ─── 连接 ───
+
+    fun connect(device: ScannedDevice) {
+        veepooManager.connectDevice(device.mac)
+    }
+
+    fun disconnect() {
+        veepooManager.disconnect()
+    }
+
+    // ─── 读取数据 ───
+
+    fun readBattery() {
+        veepooManager.readBattery()
+    }
 
     fun readAllOriginData() {
         _syncState.value = SyncState.ReadingData
         veepooManager.readAllOriginData()
-        viewModelScope.launch {
-            delay(2000)
-            val originData = veepooManager.latestOriginData.value
-            if (originData.isEmpty()) {
-                _syncState.value = SyncState.Success("no origin data available on device, sync from backend")
-            } else {
-                _syncState.value = SyncState.Success("read ${originData.size} origin records")
-            }
-        }
     }
 
     fun readSleepData() {
         _syncState.value = SyncState.ReadingSleep
         veepooManager.readSleepData()
-        viewModelScope.launch {
-            delay(2000)
-            val sleepData = veepooManager.latestSleepData.value
-            if (sleepData == null) {
-                _syncState.value = SyncState.Success("no sleep data on device, sync from backend")
-            } else {
-                _syncState.value = SyncState.Success("sleep data read successfully")
-            }
-        }
     }
 
+    // ─── 上传数据 ───
+
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
+        val originData = veepooManager.latestOriginData.value
+        if (originData.isEmpty()) {
+            _uploadResult.value = "没有可上传的数据"
+            return
+        }
+
         viewModelScope.launch {
-            _syncState.value = SyncState.Uploading
-            val originData = veepooManager.latestOriginData.value
-            if (originData.isNotEmpty()) {
-                val records = veepooManager.convertOriginDataToUploadFormat(originData)
-                if (records.isNotEmpty()) {
-                    veepooRepository.uploadOrigin5min(userId, getDeviceId(), records).collect { result ->
-                        when (result) {
-                            is ApiResult.Success -> {
-                                val resp = result.data
-                                _syncState.value = SyncState.Success("upload ${resp.recordsProcessed} records")
-                            }
-                            is ApiResult.Error -> {
-                                _syncState.value = SyncState.Error(result.message)
-                            }
-                            ApiResult.Loading -> {}
-                        }
-                    }
-                    return@launch
-                }
-            }
-            veepooRepository.syncAllData(userId, getDeviceId(), generateSampleRecords()).collect { result ->
+            val records = veepooManager.convertOriginDataToUploadFormat(originData)
+            veepooRepository.uploadOrigin5min(
+                userId = userId,
+                deviceId = veepooManager.connectionState.value.let { state ->
+                    if (state is ConnectionState.Connected) state.mac else null
+                },
+                records = records
+            ).collect { result ->
                 when (result) {
+                    is ApiResult.Loading -> {
+                        _syncState.value = SyncState.Uploading
+                    }
                     is ApiResult.Success -> {
-                        val resp = result.data
-                        _syncState.value = SyncState.Success("sync ${resp.recordsProcessed} records")
+                        _syncState.value = SyncState.Success(
+                            "已上传 ${result.data.recordsProcessed} 条数据，生成 ${result.data.metricIds.size} 条指标"
+                        )
+                        _uploadResult.value = result.data.message
                     }
                     is ApiResult.Error -> {
                         _syncState.value = SyncState.Error(result.message)
+                        _uploadResult.value = "上传失败: ${result.message}"
                     }
-                    ApiResult.Loading -> {}
                 }
             }
         }
     }
 
-    private fun getDeviceId(): String? {
-        return (connectionState.value as? ConnectionState.Connected)?.mac
+    fun uploadSleepData(userId: String = VeepooManager.DEFAULT_USER_ID) {
+        val sleepData = veepooManager.latestSleepData.value ?: run {
+            _uploadResult.value = "没有可上传的睡眠数据"
+            return
+        }
+
+        viewModelScope.launch {
+            val request = veepooManager.convertSleepDataToUploadFormat(sleepData)
+            veepooRepository.uploadSleep(
+                userId = userId,
+                deviceId = veepooManager.connectionState.value.let { state ->
+                    if (state is ConnectionState.Connected) state.mac else null
+                },
+                request = request
+            ).collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> {
+                        _syncState.value = SyncState.Uploading
+                    }
+                    is ApiResult.Success -> {
+                        _syncState.value = SyncState.Success("睡眠数据上传成功")
+                        _uploadResult.value = result.data.message
+                    }
+                    is ApiResult.Error -> {
+                        _syncState.value = SyncState.Error(result.message)
+                        _uploadResult.value = "上传失败: ${result.message}"
+                    }
+                }
+            }
+        }
     }
 
-    private fun generateSampleRecords(): List<com.vitasleep.android.data.model.VeepooOriginRecord> {
-        val now = System.currentTimeMillis()
-        return (0 until 12).map { i ->
-            val ts = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-                .format(java.util.Date(now - (i * 5 * 60 * 1000L)))
-            com.vitasleep.android.data.model.VeepooOriginRecord(
-                timestamp = ts,
-                heartRate = (60 + (0..20).random()),
-                systolic = (110 + (0..20).random()),
-                diastolic = (70 + (0..15).random()),
-                steps = (100..500).random()
-            )
+    // ─── 全量同步：读取 + 上传 ───
+
+    fun syncAllData(userId: String = VeepooManager.DEFAULT_USER_ID) {
+        viewModelScope.launch {
+            _syncState.value = SyncState.ReadingData
+            veepooManager.readAllOriginData()
+
+            try {
+                withTimeoutOrNull(5000L) {
+                    veepooManager.latestOriginData
+                        .filter { it.isNotEmpty() }
+                        .take(1)
+                        .collect { originData ->
+                            val records = veepooManager.convertOriginDataToUploadFormat(originData)
+                            _syncState.value = SyncState.Uploading
+
+                            veepooRepository.syncAllData(
+                                userId = userId,
+                                deviceId = (veepooManager.connectionState.value as? ConnectionState.Connected)?.mac,
+                                records = records
+                            ).collect { result ->
+                                when (result) {
+                                    is ApiResult.Loading -> {}
+                                    is ApiResult.Success -> {
+                                        _syncState.value = SyncState.Success(
+                                            "全量同步完成: ${result.data.recordsProcessed} 条数据"
+                                        )
+                                    }
+                                    is ApiResult.Error -> {
+                                        _syncState.value = SyncState.Error(result.message)
+                                    }
+                                }
+                            }
+                        }
+                } ?: run {
+                    _syncState.value = SyncState.Error("未读取到设备数据，请确认设备已连接")
+                }
+            } catch (e: Exception) {
+                _syncState.value = SyncState.Error(e.message ?: "同步失败")
+            }
         }
     }
 }
 
-private suspend fun ViewModel.delay(timeMillis: Long) = kotlinx.coroutines.delay(timeMillis)
-
 sealed class SyncState {
-    object Idle : SyncState()
-    object ReadingData : SyncState()
-    object ReadingSleep : SyncState()
-    object Uploading : SyncState()
+    data object Idle : SyncState()
+    data object ReadingData : SyncState()
+    data object ReadingSleep : SyncState()
+    data object Uploading : SyncState()
     data class Success(val message: String) : SyncState()
     data class Error(val message: String) : SyncState()
 }

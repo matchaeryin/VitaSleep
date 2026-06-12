@@ -17,21 +17,22 @@ data class ChatUiState(
 )
 
 @HiltViewModel
-class ChatViewModel @Inject constructor(private val repository: ChatRepository) : ViewModel() {
+class ChatViewModel @Inject constructor(
+    private val repository: ChatRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
 
-    fun loadChatHistory(userId: String) {
+    fun loadHistory(userId: String) {
         viewModelScope.launch {
             repository.getChatHistory(userId).collect { result ->
                 when (result) {
                     is ApiResult.Success -> {
-                        _uiState.value = _uiState.value.copy(messages = result.data, error = null)
+                        val sorted = result.data.sortedBy { it.createdAt ?: "" }
+                        _uiState.value = _uiState.value.copy(messages = sorted)
                     }
-                    is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(error = result.message)
-                    }
+                    is ApiResult.Error -> {}
                     ApiResult.Loading -> {}
                 }
             }
@@ -39,13 +40,33 @@ class ChatViewModel @Inject constructor(private val repository: ChatRepository) 
     }
 
     fun sendMessage(userId: String, content: String) {
-        val userMsg = ChatMessage(userId = userId, role = "user", content = content)
-        _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + userMsg, isLoading = true)
+        // 先添加用户消息到本地
+        val userMsg = ChatMessage(
+            userId = userId,
+            role = "user",
+            content = content
+        )
+        _uiState.value = _uiState.value.copy(
+            messages = _uiState.value.messages + userMsg,
+            isLoading = true,
+            error = null
+        )
+
         viewModelScope.launch {
             repository.sendMessage(userId, content).collect { result ->
                 when (result) {
-                    is ApiResult.Success -> _uiState.value = _uiState.value.copy(isLoading = false, messages = _uiState.value.messages + result.data)
-                    is ApiResult.Error -> _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            messages = _uiState.value.messages + result.data
+                        )
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = result.message
+                        )
+                    }
                     ApiResult.Loading -> {}
                 }
             }
