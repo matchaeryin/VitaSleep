@@ -38,10 +38,14 @@ class ScheduleViewModel @Inject constructor(private val repository: ScheduleRepo
 
     fun createSchedule(userId: String, title: String, startTime: String, endTime: String) {
         viewModelScope.launch {
-            val request = CreateScheduleRequest(userId, title, startTime = startTime, endTime = endTime)
-            when (val result = repository.createSchedule(request)) {
-                is ApiResult.Success -> _uiState.value = _uiState.value.copy(schedules = _uiState.value.schedules + result.data)
-                else -> {}
+            try {
+                val request = CreateScheduleRequest(userId, title, startTime = startTime, endTime = endTime)
+                when (val result = repository.createSchedule(request)) {
+                    is ApiResult.Success -> _uiState.value = _uiState.value.copy(schedules = _uiState.value.schedules + result.data)
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
