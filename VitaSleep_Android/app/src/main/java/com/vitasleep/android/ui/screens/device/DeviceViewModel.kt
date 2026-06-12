@@ -13,7 +13,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,20 +23,19 @@ class DeviceViewModel @Inject constructor(
 
     private val veepooManager = VeepooManager.getInstance(context)
 
-    // UI 状态
     val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
     val latestOriginData = veepooManager.latestOriginData
     val isScanning = veepooManager.isScanning
+    val originDataProgress = veepooManager.originDataProgress
+    val originDataReading = veepooManager.originDataReading
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState
 
     private val _uploadResult = MutableStateFlow<String?>(null)
     val uploadResult: StateFlow<String?> = _uploadResult
-
-    // ─── 扫描 ───
 
     fun startScan() {
         veepooManager.startScan()
@@ -47,17 +45,13 @@ class DeviceViewModel @Inject constructor(
         veepooManager.stopScan()
     }
 
-    // ─── 连接 ───
-
     fun connect(device: ScannedDevice) {
-        veepooManager.connectDevice(device.mac)
+        veepooManager.connectDevice(device.mac, device.name)
     }
 
     fun disconnect() {
         veepooManager.disconnect()
     }
-
-    // ─── 读取数据 ───
 
     fun readBattery() {
         veepooManager.readBattery()
@@ -72,8 +66,6 @@ class DeviceViewModel @Inject constructor(
         _syncState.value = SyncState.ReadingSleep
         veepooManager.readSleepData()
     }
-
-    // ─── 上传数据 ───
 
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         val originData = veepooManager.latestOriginData.value
@@ -142,43 +134,43 @@ class DeviceViewModel @Inject constructor(
         }
     }
 
-    // ─── 全量同步：读取 + 上传 ───
-
     fun syncAllData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         viewModelScope.launch {
             _syncState.value = SyncState.ReadingData
             veepooManager.readAllOriginData()
 
             try {
-                withTimeoutOrNull(5000L) {
-                    veepooManager.latestOriginData
-                        .filter { it.isNotEmpty() }
-                        .take(1)
-                        .collect { originData ->
-                            val records = veepooManager.convertOriginDataToUploadFormat(originData)
-                            _syncState.value = SyncState.Uploading
+                veepooManager.originDataReading
+                    .filter { !it }
+                    .take(1)
+                    .collect {
+                        val originData = veepooManager.latestOriginData.value
+                        if (originData.isEmpty()) {
+                            _syncState.value = SyncState.Error("未读取到设备数据，请确认设备已连接")
+                            return@collect
+                        }
 
-                            veepooRepository.syncAllData(
-                                userId = userId,
-                                deviceId = (veepooManager.connectionState.value as? ConnectionState.Connected)?.mac,
-                                records = records
-                            ).collect { result ->
-                                when (result) {
-                                    is ApiResult.Loading -> {}
-                                    is ApiResult.Success -> {
-                                        _syncState.value = SyncState.Success(
-                                            "全量同步完成: ${result.data.recordsProcessed} 条数据"
-                                        )
-                                    }
-                                    is ApiResult.Error -> {
-                                        _syncState.value = SyncState.Error(result.message)
-                                    }
+                        val records = veepooManager.convertOriginDataToUploadFormat(originData)
+                        _syncState.value = SyncState.Uploading
+
+                        veepooRepository.syncAllData(
+                            userId = userId,
+                            deviceId = (veepooManager.connectionState.value as? ConnectionState.Connected)?.mac,
+                            records = records
+                        ).collect { result ->
+                            when (result) {
+                                is ApiResult.Loading -> {}
+                                is ApiResult.Success -> {
+                                    _syncState.value = SyncState.Success(
+                                        "全量同步完成: ${result.data.recordsProcessed} 条数据"
+                                    )
+                                }
+                                is ApiResult.Error -> {
+                                    _syncState.value = SyncState.Error(result.message)
                                 }
                             }
                         }
-                } ?: run {
-                    _syncState.value = SyncState.Error("未读取到设备数据，请确认设备已连接")
-                }
+                    }
             } catch (e: Exception) {
                 _syncState.value = SyncState.Error(e.message ?: "同步失败")
             }
