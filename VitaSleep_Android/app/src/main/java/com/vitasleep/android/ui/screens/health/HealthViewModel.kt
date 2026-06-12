@@ -43,35 +43,39 @@ class HealthViewModel @Inject constructor(
     fun loadLatestMetrics(userId: String) {
         currentUserId = userId
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            repository.getLatestMetrics(userId).collect { result ->
-                when (result) {
-                    is ApiResult.Success -> {
-                        val metrics = result.data
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            battery = parseBattery(metrics["battery"]?.value),
-                            heartRate = parseHeartRate(metrics["heart_rate"]?.value),
-                            bloodPressure = parseBloodPressure(metrics["blood_pressure"]?.value),
-                            cardioIndex = parseCardioIndex(metrics["cardio_index"]?.value),
-                            cardioScore = parseCardioScore(metrics["cardio_index"]?.value),
-                            cardioLevel = parseCardioLevel(metrics["cardio_index"]?.value),
-                            cardioRisk = parseCardioRisk(metrics["cardio_index"]?.value),
-                            hrv = parseHrv(metrics["hrv"]?.value),
-                            recentMetrics = metrics.values.toList(),
-                            lastUpdateTime = System.currentTimeMillis(),
-                            error = null
-                        )
+                repository.getLatestMetrics(userId).collect { result ->
+                    when (result) {
+                        is ApiResult.Success -> {
+                            val metrics = result.data
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                battery = parseBattery(metrics["battery"]?.value),
+                                heartRate = parseHeartRate(metrics["heart_rate"]?.value),
+                                bloodPressure = parseBloodPressure(metrics["blood_pressure"]?.value),
+                                cardioIndex = parseCardioIndex(metrics["cardio_index"]?.value),
+                                cardioScore = parseCardioScore(metrics["cardio_index"]?.value),
+                                cardioLevel = parseCardioLevel(metrics["cardio_index"]?.value),
+                                cardioRisk = parseCardioRisk(metrics["cardio_index"]?.value),
+                                hrv = parseHrv(metrics["hrv"]?.value),
+                                recentMetrics = metrics.values.toList(),
+                                lastUpdateTime = System.currentTimeMillis(),
+                                error = null
+                            )
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        }
+                        ApiResult.Loading -> {}
                     }
-                    is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
-                    ApiResult.Loading -> {}
                 }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
@@ -96,9 +100,8 @@ class HealthViewModel @Inject constructor(
                     is SseHealthEvent.Heartbeat -> {
                         // 心跳，不做处理
                     }
-                    is SseHealthEvent.Error -> {
-                        // 连接错误，可选重连
-                        println("[HealthVM] SSE 错误: ${event.message}")
+                    is SseHealthEvent.Disconnected -> {
+                        println("[HealthVM] SSE 断开: ${event.message}")
                     }
                     is SseHealthEvent.Message -> {
                         // 其他消息
@@ -108,7 +111,7 @@ class HealthViewModel @Inject constructor(
         }
 
         // 建立 SSE 连接
-        sseClient.connect(userId, baseUrl)
+        sseClient.connectSafely(userId, baseUrl)
         _uiState.value = _uiState.value.copy(isSseConnected = true)
         println("[HealthVM] SSE 连接已建立: userId=$userId")
     }
