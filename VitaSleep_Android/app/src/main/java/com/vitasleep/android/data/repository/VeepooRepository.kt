@@ -31,7 +31,7 @@ class VeepooRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("上传失败: ${response.code()}", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
@@ -52,7 +52,7 @@ class VeepooRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("上传失败", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
@@ -78,7 +78,7 @@ class VeepooRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error("同步失败", response.code()))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emit(ApiResult.Error(e.message ?: "网络错误"))
         }
     }
