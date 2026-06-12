@@ -60,15 +60,12 @@ android {
     }
 }
 
-configurations {
-    all {
-        exclude group: 'com.google.code.gson', module: 'gson'
-    }
-}
-
 dependencies {
     // ─── Veepoo SDK ───
-    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    implementation fileTree(include: ['*.aar'], dir: 'libs')
+
+    // ─── Gson ───
+    implementation 'com.google.code.gson:gson:2.10.1'
 
     // ─── AndroidX Core ───
     implementation 'androidx.core:core-ktx:1.12.0'
