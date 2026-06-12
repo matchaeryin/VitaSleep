@@ -74,7 +74,7 @@ class HealthViewModel @Inject constructor(
                         ApiResult.Loading -> {}
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
