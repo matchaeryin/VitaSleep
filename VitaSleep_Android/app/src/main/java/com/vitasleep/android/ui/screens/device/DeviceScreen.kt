@@ -34,22 +34,23 @@ fun DeviceScreen(
     val deviceBattery by viewModel.deviceBattery.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val uploadResult by viewModel.uploadResult.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 页面标题
+        // 椤甸潰鏍囬
         Text(
-            text = "设备管理",
+            text = "璁惧绠＄悊",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = OnBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ─── 连接状态卡片 ───
+        // 鈹€鈹€鈹€ 杩炴帴鐘舵€佸崱鐗?鈹€鈹€鈹€
         ConnectionStatusCard(
             connectionState = connectionState,
             battery = deviceBattery,
@@ -59,12 +60,13 @@ fun DeviceScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ─── 设备扫描区域 ───
+        // 鈹€鈹€鈹€ 璁惧鎵弿鍖哄煙 鈹€鈹€鈹€
         when (connectionState) {
             is ConnectionState.Disconnected,
             is ConnectionState.Error -> {
                 DeviceScanSection(
                     scannedDevices = scannedDevices,
+                    isScanning = isScanning,
                     onScan = { viewModel.startScan() },
                     onStopScan = { viewModel.stopScan() },
                     onConnect = { viewModel.connect(it) },
@@ -88,12 +90,12 @@ fun DeviceScreen(
                 ) {
                     CircularProgressIndicator(color = Primary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("连接中…", color = OnSurface)
+                    Text("杩炴帴涓€?, color = OnSurface)
                 }
             }
         }
 
-        // ─── 上传结果提示 ───
+        // 鈹€鈹€鈹€ 涓婁紶缁撴灉鎻愮ず 鈹€鈹€鈹€
         uploadResult?.let { result ->
             Spacer(modifier = Modifier.height(12.dp))
             Card(
@@ -148,10 +150,10 @@ fun ConnectionStatusCard(
                 Column {
                     Text(
                         text = when (connectionState) {
-                            is ConnectionState.Connected -> "已连接"
-                            is ConnectionState.Connecting -> "连接中…"
-                            is ConnectionState.Error -> "连接失败"
-                            is ConnectionState.Disconnected -> "未连接"
+                            is ConnectionState.Connected -> "宸茶繛鎺?
+                            is ConnectionState.Connecting -> "杩炴帴涓€?
+                            is ConnectionState.Error -> "杩炴帴澶辫触"
+                            is ConnectionState.Disconnected -> "鏈繛鎺?
                         },
                         fontWeight = FontWeight.Medium,
                         color = OnSurface
@@ -177,16 +179,16 @@ fun ConnectionStatusCard(
                 if (connectionState is ConnectionState.Connected) {
                     battery?.let {
                         Text(
-                            text = "电量: $it%",
+                            text = "鐢甸噺: $it%",
                             color = OnSurfaceVariant,
                             modifier = Modifier.padding(end = 8.dp)
                         )
                     }
                     IconButton(onClick = onReadBattery) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新电量", tint = Primary)
+                        Icon(Icons.Default.Refresh, contentDescription = "鍒锋柊鐢甸噺", tint = Primary)
                     }
                     IconButton(onClick = onDisconnect) {
-                        Icon(Icons.Default.Close, contentDescription = "断开连接", tint = Error)
+                        Icon(Icons.Default.Close, contentDescription = "鏂紑杩炴帴", tint = Error)
                     }
                 }
             }
@@ -197,6 +199,7 @@ fun ConnectionStatusCard(
 @Composable
 fun DeviceScanSection(
     scannedDevices: List<ScannedDevice>,
+    isScanning: Boolean,
     onScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (ScannedDevice) -> Unit,
@@ -212,14 +215,35 @@ fun DeviceScanSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("发现设备", fontWeight = FontWeight.Medium, color = OnSurface)
-                Button(
-                    onClick = onScan,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("扫描")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("鍙戠幇璁惧", fontWeight = FontWeight.Medium, color = OnSurface)
+                    if (isScanning) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("鎵弿涓?..", fontSize = 12.sp, color = Primary)
+                    }
+                }
+                if (isScanning) {
+                    OutlinedButton(
+                        onClick = onStopScan,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Error)
+                    ) {
+                        Text("鍋滄", fontSize = 12.sp)
+                    }
+                } else {
+                    Button(
+                        onClick = onScan,
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("鎵弿")
+                    }
                 }
             }
 
@@ -227,7 +251,7 @@ fun DeviceScanSection(
 
             if (scannedDevices.isEmpty()) {
                 Text(
-                    "点击扫描按钮搜索 Veepoo 设备",
+                    if (isScanning) "姝ｅ湪鎼滅储闄勮繎钃濈墮璁惧..." else "鐐瑰嚮鎵弿鎸夐挳鎼滅储 Veepoo 璁惧",
                     color = OnSurfaceVariant,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -293,11 +317,10 @@ fun DataSyncSection(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("数据同步", fontWeight = FontWeight.Medium, color = OnSurface)
+            Text("鏁版嵁鍚屾", fontWeight = FontWeight.Medium, color = OnSurface)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 同步状态
-            when (syncState) {
+            // 鍚屾鐘舵€?            when (syncState) {
                 is SyncState.ReadingData -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
@@ -306,7 +329,7 @@ fun DataSyncSection(
                             color = Primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("正在读取设备数据…", color = OnSurfaceVariant, fontSize = 13.sp)
+                        Text("姝ｅ湪璇诲彇璁惧鏁版嵁鈥?, color = OnSurfaceVariant, fontSize = 13.sp)
                     }
                 }
                 is SyncState.ReadingSleep -> {
@@ -317,7 +340,7 @@ fun DataSyncSection(
                             color = Primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("正在读取睡眠数据…", color = OnSurfaceVariant, fontSize = 13.sp)
+                        Text("姝ｅ湪璇诲彇鐫＄湢鏁版嵁鈥?, color = OnSurfaceVariant, fontSize = 13.sp)
                     }
                 }
                 is SyncState.Uploading -> {
@@ -328,7 +351,7 @@ fun DataSyncSection(
                             color = Secondary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("正在上传数据…", color = OnSurfaceVariant, fontSize = 13.sp)
+                        Text("姝ｅ湪涓婁紶鏁版嵁鈥?, color = OnSurfaceVariant, fontSize = 13.sp)
                     }
                 }
                 is SyncState.Success -> {
@@ -347,7 +370,7 @@ fun DataSyncSection(
                 }
                 SyncState.Idle -> {
                     Text(
-                        "点击下方按钮从设备读取数据并上传到服务器",
+                        "鐐瑰嚮涓嬫柟鎸夐挳浠庤澶囪鍙栨暟鎹苟涓婁紶鍒版湇鍔″櫒",
                         color = OnSurfaceVariant,
                         fontSize = 13.sp
                     )
@@ -356,7 +379,7 @@ fun DataSyncSection(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 操作按钮
+            // 鎿嶄綔鎸夐挳
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -368,7 +391,7 @@ fun DataSyncSection(
                 ) {
                     Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("读取健康", fontSize = 12.sp)
+                    Text("璇诲彇鍋ュ悍", fontSize = 12.sp)
                 }
                 OutlinedButton(
                     onClick = onReadSleep,
@@ -377,7 +400,7 @@ fun DataSyncSection(
                 ) {
                     Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("读取睡眠", fontSize = 12.sp)
+                    Text("璇诲彇鐫＄湢", fontSize = 12.sp)
                 }
             }
 
@@ -395,7 +418,7 @@ fun DataSyncSection(
                 ) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("上传健康", fontSize = 12.sp)
+                    Text("涓婁紶鍋ュ悍", fontSize = 12.sp)
                 }
                 Button(
                     onClick = onUploadSleep,
@@ -405,7 +428,7 @@ fun DataSyncSection(
                 ) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("上传睡眠", fontSize = 12.sp)
+                    Text("涓婁紶鐫＄湢", fontSize = 12.sp)
                 }
             }
 
@@ -419,7 +442,7 @@ fun DataSyncSection(
             ) {
                 Icon(Icons.Default.Sync, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("一键全量同步（读取 + 上传）")
+                Text("涓€閿叏閲忓悓姝ワ紙璇诲彇 + 涓婁紶锛?)
             }
         }
     }

@@ -24,11 +24,11 @@ class DeviceViewModel @Inject constructor(
 
     private val veepooManager = VeepooManager.getInstance(context)
 
-    // UI 状态
-    val connectionState = veepooManager.connectionState
+    // UI 鐘舵€?    val connectionState = veepooManager.connectionState
     val scannedDevices = veepooManager.scannedDevices
     val deviceBattery = veepooManager.deviceBattery
     val latestOriginData = veepooManager.latestOriginData
+    val isScanning = veepooManager.isScanning
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState
@@ -36,7 +36,7 @@ class DeviceViewModel @Inject constructor(
     private val _uploadResult = MutableStateFlow<String?>(null)
     val uploadResult: StateFlow<String?> = _uploadResult
 
-    // ─── 扫描 ───
+    // 鈹€鈹€鈹€ 鎵弿 鈹€鈹€鈹€
 
     fun startScan() {
         veepooManager.startScan()
@@ -46,7 +46,7 @@ class DeviceViewModel @Inject constructor(
         veepooManager.stopScan()
     }
 
-    // ─── 连接 ───
+    // 鈹€鈹€鈹€ 杩炴帴 鈹€鈹€鈹€
 
     fun connect(device: ScannedDevice) {
         veepooManager.connectDevice(device.mac)
@@ -56,7 +56,7 @@ class DeviceViewModel @Inject constructor(
         veepooManager.disconnect()
     }
 
-    // ─── 读取数据 ───
+    // 鈹€鈹€鈹€ 璇诲彇鏁版嵁 鈹€鈹€鈹€
 
     fun readBattery() {
         veepooManager.readBattery()
@@ -72,12 +72,12 @@ class DeviceViewModel @Inject constructor(
         veepooManager.readSleepData()
     }
 
-    // ─── 上传数据 ───
+    // 鈹€鈹€鈹€ 涓婁紶鏁版嵁 鈹€鈹€鈹€
 
     fun uploadOriginData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         val originData = veepooManager.latestOriginData.value
         if (originData.isEmpty()) {
-            _uploadResult.value = "没有可上传的数据"
+            _uploadResult.value = "娌℃湁鍙笂浼犵殑鏁版嵁"
             return
         }
 
@@ -96,13 +96,13 @@ class DeviceViewModel @Inject constructor(
                     }
                     is ApiResult.Success -> {
                         _syncState.value = SyncState.Success(
-                            "已上传 ${result.data.recordsProcessed} 条数据，生成 ${result.data.metricIds.size} 条指标"
+                            "宸蹭笂浼?${result.data.recordsProcessed} 鏉℃暟鎹紝鐢熸垚 ${result.data.metricIds.size} 鏉℃寚鏍?
                         )
                         _uploadResult.value = result.data.message
                     }
                     is ApiResult.Error -> {
                         _syncState.value = SyncState.Error(result.message)
-                        _uploadResult.value = "上传失败: ${result.message}"
+                        _uploadResult.value = "涓婁紶澶辫触: ${result.message}"
                     }
                 }
             }
@@ -111,7 +111,7 @@ class DeviceViewModel @Inject constructor(
 
     fun uploadSleepData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         val sleepData = veepooManager.latestSleepData.value ?: run {
-            _uploadResult.value = "没有可上传的睡眠数据"
+            _uploadResult.value = "娌℃湁鍙笂浼犵殑鐫＄湢鏁版嵁"
             return
         }
 
@@ -129,19 +129,19 @@ class DeviceViewModel @Inject constructor(
                         _syncState.value = SyncState.Uploading
                     }
                     is ApiResult.Success -> {
-                        _syncState.value = SyncState.Success("睡眠数据上传成功")
+                        _syncState.value = SyncState.Success("鐫＄湢鏁版嵁涓婁紶鎴愬姛")
                         _uploadResult.value = result.data.message
                     }
                     is ApiResult.Error -> {
                         _syncState.value = SyncState.Error(result.message)
-                        _uploadResult.value = "上传失败: ${result.message}"
+                        _uploadResult.value = "涓婁紶澶辫触: ${result.message}"
                     }
                 }
             }
         }
     }
 
-    // ─── 全量同步：读取 + 上传 ───
+    // 鈹€鈹€鈹€ 鍏ㄩ噺鍚屾锛氳鍙?+ 涓婁紶 鈹€鈹€鈹€
 
     fun syncAllData(userId: String = VeepooManager.DEFAULT_USER_ID) {
         viewModelScope.launch {
@@ -166,7 +166,7 @@ class DeviceViewModel @Inject constructor(
                                     is ApiResult.Loading -> {}
                                     is ApiResult.Success -> {
                                         _syncState.value = SyncState.Success(
-                                            "全量同步完成: ${result.data.recordsProcessed} 条数据"
+                                            "鍏ㄩ噺鍚屾瀹屾垚: ${result.data.recordsProcessed} 鏉℃暟鎹?
                                         )
                                     }
                                     is ApiResult.Error -> {
@@ -176,10 +176,10 @@ class DeviceViewModel @Inject constructor(
                             }
                         }
                 } ?: run {
-                    _syncState.value = SyncState.Error("未读取到设备数据，请确认设备已连接")
+                    _syncState.value = SyncState.Error("鏈鍙栧埌璁惧鏁版嵁锛岃纭璁惧宸茶繛鎺?)
                 }
             } catch (e: Exception) {
-                _syncState.value = SyncState.Error(e.message ?: "同步失败")
+                _syncState.value = SyncState.Error(e.message ?: "鍚屾澶辫触")
             }
         }
     }
