@@ -31,7 +31,10 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     LaunchedEffect(userId) {
-        viewModel.loadHistory(userId)
+        try {
+            viewModel.loadHistory(userId)
+        } catch (e: Exception) {
+        }
     }
 
     LaunchedEffect(uiState.messages.size) {
