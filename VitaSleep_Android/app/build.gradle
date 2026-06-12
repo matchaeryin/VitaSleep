@@ -62,21 +62,15 @@ android {
     }
 }
 
-repositories {
-    flatDir {
-        dirs 'libs'
+configurations {
+    all {
+        exclude group: 'com.google.code.gson', module: 'gson'
     }
 }
 
 dependencies {
     // ─── Veepoo SDK ───
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
-
-    configurations {
-        all {
-            exclude group: 'com.google.code.gson', module: 'gson'
-        }
-    }
 
     // ─── AndroidX Core ───
     implementation 'androidx.core:core-ktx:1.12.0'
