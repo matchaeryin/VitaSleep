@@ -18,7 +18,6 @@ import com.vitasleep.android.data.model.VeepooOriginRecord
 import com.vitasleep.android.data.model.VeepooSleepDataRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.text.SimpleDateFormat
 import java.util.Locale
 
 class VeepooManager private constructor(
@@ -76,7 +75,7 @@ class VeepooManager private constructor(
         }
     }
 
-    private val connectStatusListener = object : IABleConnectStatusListener {
+    private val connectStatusListener = object : IABleConnectStatusListener() {
         override fun onConnectStatusChanged(mac: String, status: Int) {
             if (status == Constants.STATUS_DISCONNECTED) {
                 _connectionState.value = ConnectionState.Disconnected
@@ -176,7 +175,7 @@ class VeepooManager private constructor(
 
     fun disconnect() {
         vpOperateManager.disconnectWatch(defaultWriteResponse)
-        connectedMac?.let { vpOperateManager.unregisterConnectStatusListener(it) }
+        connectedMac?.let { vpOperateManager.unregisterConnectStatusListener(it, connectStatusListener) }
         _connectionState.value = ConnectionState.Disconnected
         _deviceBattery.value = null
     }
@@ -205,7 +204,7 @@ class VeepooManager private constructor(
             object : IOriginData3Listener {
                 override fun onOriginFiveMinuteListDataChange(originDataList: MutableList<OriginData3>) {
                     for (originData in originDataList) {
-                        val timeData = originData.mTime
+                        val timeData = originData.getmTime()
                         val timestamp = String.format(
                             Locale.getDefault(),
                             "%04d-%02d-%02dT%02d:%02d:00",
