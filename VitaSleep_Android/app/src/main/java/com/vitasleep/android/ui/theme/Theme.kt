@@ -34,8 +34,8 @@ fun VitaSleepTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Background.toArgb()
-            window.navigationBarColor = Background.toArgb()
+            window.statusBarColor = DeepBg.toArgb()
+            window.navigationBarColor = DeepBg.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
