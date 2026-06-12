@@ -70,7 +70,7 @@ class SleepViewModel @Inject constructor(private val repository: HealthRepositor
                         ApiResult.Loading -> {}
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
