@@ -62,7 +62,7 @@ android {
 
 dependencies {
     // ─── Veepoo SDK ───
-    implementation fileTree(include: ['*.aar'], dir: 'libs')
+    implementation fileTree(include: ['*.aar', '*.jar'], dir: 'libs')
 
     // ─── Gson ───
     implementation 'com.google.code.gson:gson:2.10.1'
