@@ -147,24 +147,57 @@ class VitaSleepApp : Application() {
         try {
             if (prevPid <= 0) return
 
-            val process = Runtime.getRuntime().exec(
-                arrayOf("logcat", "-d", "-b", "crash", "-t", "500")
-            )
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
             val sb = StringBuilder()
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                val l = line ?: continue
-                if (l.contains("pid $prevPid") || l.contains("vitasleep", ignoreCase = true) ||
-                    l.contains("Fatal signal") || l.contains("SIGSEGV") ||
-                    l.contains("SIGABRT") || l.contains("tombstone") ||
-                    l.contains("abort message") || l.contains("backtrace:")
-                ) {
-                    sb.appendLine(l)
+
+            // 1) Dump the ENTIRE crash buffer WITHOUT line-level filtering.
+            //    Previous version filtered by "pid N"/keywords, which dropped the
+            //    native backtrace FRAMES (e.g. "#00 pc ... libjl_fatfs.so") because
+            //    those lines contain neither a pid nor any keyword. The crash buffer
+            //    is small and dedicated to dumps, so dumping it whole is safe and
+            //    guarantees we capture the full debuggerd backtrace.
+            try {
+                val p = Runtime.getRuntime().exec(
+                    arrayOf("logcat", "-d", "-b", "crash", "-t", "1500")
+                )
+                val reader = BufferedReader(InputStreamReader(p.inputStream))
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    sb.appendLine(line)
                 }
+                reader.close()
+                p.waitFor()
+            } catch (_: Throwable) {
             }
-            reader.close()
-            process.waitFor()
+
+            // 2) Fallback: scan main buffer for the fatal-signal block belonging to
+            //    our process. Keep the whole block (header + frames) once we enter it.
+            try {
+                val p2 = Runtime.getRuntime().exec(
+                    arrayOf("logcat", "-d", "-b", "main", "-t", "3000")
+                )
+                val reader = BufferedReader(InputStreamReader(p2.inputStream))
+                var line: String?
+                var inBlock = false
+                while (reader.readLine().also { line = it } != null) {
+                    val l = line ?: continue
+                    val mine = l.contains("pid $prevPid", true) ||
+                        l.contains("pid: $prevPid", true) ||
+                        l.contains(">>> com.vitasleep.android <<<", true) ||
+                        l.contains("com.vitasleep", true)
+                    if (!inBlock && mine &&
+                        (l.contains("Fatal signal", true) || l.contains("*** ***", true) ||
+                            l.contains("SIGSEGV", true) || l.contains("SIGABRT", true))) {
+                        inBlock = true
+                    }
+                    if (inBlock) {
+                        sb.appendLine(l)
+                        if (l.isBlank()) inBlock = false
+                    }
+                }
+                reader.close()
+                p2.waitFor()
+            } catch (_: Throwable) {
+            }
 
             val crashBuf = sb.toString().trim()
             if (crashBuf.isNotEmpty()) {
@@ -178,7 +211,7 @@ class VitaSleepApp : Application() {
                 val existing = prefs.getString("crash_buffer", "")
                 val combined = if (existing.isNullOrEmpty()) newLog else "$newLog\n$existing"
                 prefs.edit()
-                    .putString("crash_buffer", combined.take(50000))
+                    .putString("crash_buffer", combined.take(80000))
                     .apply()
             }
         } catch (e: Throwable) {

@@ -178,13 +178,6 @@ class VeepooManager private constructor(
         ensureInit()
 
         try {
-            Log.d(TAG, "connectDevice: registerConnectStatusListener")
-            vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
-        } catch (e: Throwable) {
-            Log.e(TAG, "registerConnectStatusListener failed", e)
-        }
-
-        try {
             Log.d(TAG, "connectDevice: calling vpOperateManager.connectDevice")
             vpOperateManager.connectDevice(mac, name, object : IConnectResponse {
                 override fun connectState(code: Int, profile: BleGattProfile, isoadModel: Boolean) {
@@ -192,7 +185,17 @@ class VeepooManager private constructor(
                     try {
                         if (code == Code.REQUEST_SUCCESS) {
                             isOadModel = isoadModel
-                            Log.d(TAG, "connectState: SUCCESS, starting VeepooService")
+                            Log.d(TAG, "connectState: SUCCESS")
+                            // Register the connect-status listener ONLY after the GATT
+                            // layer confirms the connection, so we don't interfere with
+                            // the SDK's internal connection-state bookkeeping during setup
+                            // (crash previously observed at internal setConnectStat).
+                            try {
+                                vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
+                                Log.d(TAG, "connectState: registerConnectStatusListener OK")
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "registerConnectStatusListener failed", e)
+                            }
                             try {
                                 VeepooService.start(context)
                             } catch (e: Throwable) {
