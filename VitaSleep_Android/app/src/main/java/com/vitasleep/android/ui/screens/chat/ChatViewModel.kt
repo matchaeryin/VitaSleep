@@ -30,7 +30,7 @@ class ChatViewModel @Inject constructor(
                 repository.getChatHistory(userId).collect { result ->
                     when (result) {
                         is ApiResult.Success -> {
-                            val sorted = result.data.sortedBy { it.createdAt ?: "" }
+                            val sorted = result.data.sortedBy { it.id ?: 0 }
                             _uiState.value = _uiState.value.copy(messages = sorted)
                         }
                         is ApiResult.Error -> {}
