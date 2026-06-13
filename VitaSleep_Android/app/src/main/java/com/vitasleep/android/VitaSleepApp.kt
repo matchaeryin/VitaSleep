@@ -73,7 +73,6 @@ class VitaSleepApp : Application() {
         try {
             com.jieli.jl_rcsp.util.JL_Log.setTagPrefix("VitaSleep")
             com.jieli.jl_rcsp.util.JL_Log.configureLog(this, true, true)
-            com.jieli.jl_rcsp.util.JL_Log.setLog(true)
         } catch (e: Throwable) {
             Log.e("VitaSleepApp", "JL_Log init failed", e)
         }
