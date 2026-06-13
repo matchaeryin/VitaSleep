@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,10 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vitasleep.android.VitaSleepApp
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.ConnectionState
 import com.vitasleep.android.veepoo.ScannedDevice
@@ -36,19 +42,83 @@ fun DeviceScreen(
     val uploadResult by viewModel.uploadResult.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
 
+    val context = LocalContext.current
+    val app = context.applicationContext as VitaSleepApp
+    var crashLog by remember { mutableStateOf(app.getLastCrashLog()) }
+    var crashExpanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 页面标题
         Text(
             text = "设备管理",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = OnBackground
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        crashLog?.let { log ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { crashExpanded = !crashExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = Error)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "检测到上次崩溃日志 (点击${if (crashExpanded) "收起" else "展开"})",
+                                color = Error,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Row {
+                            TextButton(onClick = {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash_log", log))
+                            }) {
+                                Text("复制", fontSize = 12.sp, color = Primary)
+                            }
+                            TextButton(onClick = {
+                                app.clearCrashLog()
+                                crashLog = null
+                            }) {
+                                Text("清除", fontSize = 12.sp, color = OnSurfaceVariant)
+                            }
+                        }
+                    }
+                    if (crashExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = log,
+                            color = Color(0xFFB71C1C),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 30,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .heightIn(max = 300.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ─── 连接状态卡片 ───
         ConnectionStatusCard(
