@@ -45,8 +45,7 @@
         <service
             android:name="com.inuker.bluetooth.library.BluetoothService"
             android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:exported="false" />
 
         <service
             android:name=".veepoo.VeepooService"

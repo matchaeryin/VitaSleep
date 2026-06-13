@@ -90,6 +90,7 @@ class VeepooManager private constructor(
             try {
                 Log.d(TAG, "onConnectStatusChanged: mac=$mac status=$status")
                 if (status == Constants.STATUS_DISCONNECTED) {
+                    VeepooService.stop(context)
                     _connectionState.value = ConnectionState.Disconnected
                     _deviceBattery.value = null
                 }
@@ -181,6 +182,8 @@ class VeepooManager private constructor(
         connectedMac = mac
         connectedName = name
 
+        VeepooService.start(context)
+
         ensureInit()
 
         try {
@@ -201,6 +204,7 @@ class VeepooManager private constructor(
                             Log.d(TAG, "connectState: SUCCESS")
                         } else {
                             Log.e(TAG, "connectState: FAILED code=$code")
+                            VeepooService.stop(context)
                             _connectionState.value = ConnectionState.Error("连接失败 (code=$code)")
                         }
                     } catch (e: Throwable) {
@@ -217,10 +221,12 @@ class VeepooManager private constructor(
                             confirmDevicePwd()
                         } else {
                             Log.e(TAG, "notifyState: FAILED state=$state")
+                            VeepooService.stop(context)
                             _connectionState.value = ConnectionState.Error("通知服务注册失败 (state=$state)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "INotifyResponse.notifyState error", e)
+                        VeepooService.stop(context)
                         _connectionState.value = ConnectionState.Error("通知服务异常: ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
@@ -228,6 +234,7 @@ class VeepooManager private constructor(
             Log.d(TAG, "connectDevice: SDK call returned without exception")
         } catch (e: Throwable) {
             Log.e(TAG, "connectDevice FAILED", e)
+            VeepooService.stop(context)
             _connectionState.value = ConnectionState.Error("连接异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
@@ -248,6 +255,7 @@ class VeepooManager private constructor(
                     override fun onConnectionConfirmTimeout() {
                         Log.e(TAG, "onConnectionConfirmTimeout")
                         try {
+                            VeepooService.stop(context)
                             _connectionState.value = ConnectionState.Error("密码确认超时")
                         } catch (e: Throwable) {
                             Log.e(TAG, "onConnectionConfirmTimeout error", e)
@@ -306,6 +314,7 @@ class VeepooManager private constructor(
             Log.d(TAG, "confirmDevicePwd: SDK call returned without exception")
         } catch (e: Throwable) {
             Log.e(TAG, "confirmDevicePwd FAILED", e)
+            VeepooService.stop(context)
             _connectionState.value = ConnectionState.Error("密码确认异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
@@ -321,6 +330,7 @@ class VeepooManager private constructor(
         } catch (e: Throwable) {
             Log.e(TAG, "unregisterConnectStatusListener failed", e)
         }
+        VeepooService.stop(context)
         _connectionState.value = ConnectionState.Disconnected
         _deviceBattery.value = null
     }
