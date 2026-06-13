@@ -58,13 +58,17 @@ class VeepooManager private constructor(
         }
 
         override fun onDeviceFounded(device: SearchResult) {
-            val name = device.name ?: return
-            if (name.isBlank()) return
-            val mac = device.address ?: return
-            val rssi = device.rssi
+            try {
+                val name = device.name ?: return
+                if (name.isBlank()) return
+                val mac = device.address ?: return
+                val rssi = device.rssi
 
-            scannedMap[mac] = ScannedDevice(name = name, mac = mac, rssi = rssi)
-            _scannedDevices.value = scannedMap.values.sortedByDescending { it.rssi }
+                scannedMap[mac] = ScannedDevice(name = name, mac = mac, rssi = rssi)
+                _scannedDevices.value = scannedMap.values.sortedByDescending { it.rssi }
+            } catch (e: Throwable) {
+                Log.e(TAG, "onDeviceFounded error", e)
+            }
         }
 
         override fun onSearchStopped() {
@@ -78,9 +82,13 @@ class VeepooManager private constructor(
 
     private val connectStatusListener = object : IABleConnectStatusListener() {
         override fun onConnectStatusChanged(mac: String, status: Int) {
-            if (status == Constants.STATUS_DISCONNECTED) {
-                _connectionState.value = ConnectionState.Disconnected
-                _deviceBattery.value = null
+            try {
+                if (status == Constants.STATUS_DISCONNECTED) {
+                    _connectionState.value = ConnectionState.Disconnected
+                    _deviceBattery.value = null
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "connectStatusListener error", e)
             }
         }
     }
@@ -136,19 +144,28 @@ class VeepooManager private constructor(
         try {
             vpOperateManager.connectDevice(mac, name, object : IConnectResponse {
                 override fun connectState(code: Int, profile: BleGattProfile, isoadModel: Boolean) {
-                    if (code == Code.REQUEST_SUCCESS) {
-                        isOadModel = isoadModel
-                    } else {
-                        _connectionState.value = ConnectionState.Error("连接失败")
+                    try {
+                        if (code == Code.REQUEST_SUCCESS) {
+                            isOadModel = isoadModel
+                        } else {
+                            _connectionState.value = ConnectionState.Error("连接失败")
+                        }
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "IConnectResponse.connectState error", e)
                     }
                 }
             }, object : INotifyResponse {
                 override fun notifyState(state: Int) {
-                    if (state == Code.REQUEST_SUCCESS) {
-                        _connectionState.value = ConnectionState.Confirming
-                        confirmDevicePwd()
-                    } else {
-                        _connectionState.value = ConnectionState.Error("通知服务注册失败")
+                    try {
+                        if (state == Code.REQUEST_SUCCESS) {
+                            _connectionState.value = ConnectionState.Confirming
+                            confirmDevicePwd()
+                        } else {
+                            _connectionState.value = ConnectionState.Error("通知服务注册失败")
+                        }
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "INotifyResponse.notifyState error", e)
+                        _connectionState.value = ConnectionState.Error("通知服务异常: ${e.message}")
                     }
                 }
             })
@@ -167,12 +184,20 @@ class VeepooManager private constructor(
                 object : IPwdDataListener {
                     override fun onPwdDataChange(pwdData: PwdData) {}
                     override fun onConnectionConfirmTimeout() {
-                        _connectionState.value = ConnectionState.Error("密码确认超时")
+                        try {
+                            _connectionState.value = ConnectionState.Error("密码确认超时")
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onConnectionConfirmTimeout error", e)
+                        }
                     }
                 },
                 object : IDeviceFuctionDataListener {
                     override fun onFunctionSupportDataChange(functionSupport: FunctionDeviceSupportData) {
-                        watchDataDay = functionSupport.wathcDay
+                        try {
+                            watchDataDay = functionSupport.wathcDay
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onFunctionSupportDataChange error", e)
+                        }
                     }
                     override fun onDeviceFunctionPackage1Report(p1: DeviceFunctionPackage1) {}
                     override fun onDeviceFunctionPackage2Report(p2: DeviceFunctionPackage2) {}
@@ -186,10 +211,14 @@ class VeepooManager private constructor(
                 },
                 object : ICustomSettingDataListener {
                     override fun OnSettingDataChange(customSettingData: CustomSettingData) {
-                        _connectionState.value = ConnectionState.Connected(
-                            mac = connectedMac ?: "",
-                            name = connectedName ?: ""
-                        )
+                        try {
+                            _connectionState.value = ConnectionState.Connected(
+                                mac = connectedMac ?: "",
+                                name = connectedName ?: ""
+                            )
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "OnSettingDataChange error", e)
+                        }
                     }
                 },
                 "0000",
@@ -222,8 +251,12 @@ class VeepooManager private constructor(
                 override fun onResponse(code: Int) {}
             }, object : IBatteryDataListener {
                 override fun onDataChange(batteryData: BatteryData) {
-                    val percent = batteryData.batteryPercent
-                    _deviceBattery.value = if (percent > 0) percent else batteryData.batteryLevel * 25
+                    try {
+                        val percent = batteryData.batteryPercent
+                        _deviceBattery.value = if (percent > 0) percent else batteryData.batteryLevel * 25
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "onBatteryDataChange error", e)
+                    }
                 }
             })
         } catch (e: Throwable) {
@@ -244,25 +277,29 @@ class VeepooManager private constructor(
                 },
                 object : IOriginData3Listener {
                     override fun onOriginFiveMinuteListDataChange(originDataList: MutableList<OriginData3>) {
-                        for (originData in originDataList) {
-                            val timeData = originData.getmTime()
-                            val timestamp = String.format(
-                                Locale.getDefault(),
-                                "%04d-%02d-%02dT%02d:%02d:00",
-                                timeData.year, timeData.month, timeData.day,
-                                timeData.hour, timeData.minute
-                            )
-                            val record = mapOf<String, Any>(
-                                "timestamp" to timestamp,
-                                "heart_rate" to originData.rateValue,
-                                "systolic" to originData.highValue,
-                                "diastolic" to originData.lowValue,
-                                "steps" to originData.stepValue,
-                                "sport" to originData.sportValue
-                            )
-                            collectedOriginData.add(record)
+                        try {
+                            for (originData in originDataList) {
+                                val timeData = originData.getmTime()
+                                val timestamp = String.format(
+                                    Locale.getDefault(),
+                                    "%04d-%02d-%02dT%02d:%02d:00",
+                                    timeData.year, timeData.month, timeData.day,
+                                    timeData.hour, timeData.minute
+                                )
+                                val record = mapOf<String, Any>(
+                                    "timestamp" to timestamp,
+                                    "heart_rate" to originData.rateValue,
+                                    "systolic" to originData.highValue,
+                                    "diastolic" to originData.lowValue,
+                                    "steps" to originData.stepValue,
+                                    "sport" to originData.sportValue
+                                )
+                                collectedOriginData.add(record)
+                            }
+                            _latestOriginData.value = collectedOriginData.toList()
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onOriginFiveMinuteListDataChange error", e)
                         }
-                        _latestOriginData.value = collectedOriginData.toList()
                     }
 
                     override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {}
@@ -300,43 +337,47 @@ class VeepooManager private constructor(
                 },
                 object : ISleepDataListener {
                     override fun onSleepDataChange(day: String, sleepData: SleepData) {
-                        val sleepDown = sleepData.sleepDown
-                        val sleepUp = sleepData.sleepUp
+                        try {
+                            val sleepDown = sleepData.sleepDown
+                            val sleepUp = sleepData.sleepUp
 
-                        val sleepStart = if (sleepDown != null) {
-                            String.format(
-                                Locale.getDefault(),
-                                "%04d-%02d-%02dT%02d:%02d:00",
-                                sleepDown.year, sleepDown.month, sleepDown.day,
-                                sleepDown.hour, sleepDown.minute
+                            val sleepStart = if (sleepDown != null) {
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%04d-%02d-%02dT%02d:%02d:00",
+                                    sleepDown.year, sleepDown.month, sleepDown.day,
+                                    sleepDown.hour, sleepDown.minute
+                                )
+                            } else ""
+
+                            val sleepEnd = if (sleepUp != null) {
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%04d-%02d-%02dT%02d:%02d:00",
+                                    sleepUp.year, sleepUp.month, sleepUp.day,
+                                    sleepUp.hour, sleepUp.minute
+                                )
+                            } else ""
+
+                            val totalMin = sleepData.allSleepTime
+                            val deepMin = sleepData.deepSleepTime
+                            val lightMin = sleepData.lowSleepTime
+                            val awakeMin = totalMin - deepMin - lightMin
+
+                            val result = mapOf<String, Any>(
+                                "sleep_date" to day,
+                                "sleep_start" to sleepStart,
+                                "sleep_end" to sleepEnd,
+                                "total_sleep_min" to totalMin,
+                                "deep_sleep_min" to deepMin,
+                                "light_sleep_min" to lightMin,
+                                "rem_sleep_min" to 0,
+                                "awake_min" to awakeMin
                             )
-                        } else ""
-
-                        val sleepEnd = if (sleepUp != null) {
-                            String.format(
-                                Locale.getDefault(),
-                                "%04d-%02d-%02dT%02d:%02d:00",
-                                sleepUp.year, sleepUp.month, sleepUp.day,
-                                sleepUp.hour, sleepUp.minute
-                            )
-                        } else ""
-
-                        val totalMin = sleepData.allSleepTime
-                        val deepMin = sleepData.deepSleepTime
-                        val lightMin = sleepData.lowSleepTime
-                        val awakeMin = totalMin - deepMin - lightMin
-
-                        val result = mapOf<String, Any>(
-                            "sleep_date" to day,
-                            "sleep_start" to sleepStart,
-                            "sleep_end" to sleepEnd,
-                            "total_sleep_min" to totalMin,
-                            "deep_sleep_min" to deepMin,
-                            "light_sleep_min" to lightMin,
-                            "rem_sleep_min" to 0,
-                            "awake_min" to awakeMin
-                        )
-                        _latestSleepData.value = result
+                            _latestSleepData.value = result
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onSleepDataChange error", e)
+                        }
                     }
 
                     override fun onSleepProgress(progress: Float) {}
