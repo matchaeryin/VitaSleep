@@ -1,6 +1,9 @@
 package com.vitasleep.android
 
 import android.app.Application
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.veepoo.protocol.VPOperateManager
 import com.veepoo.protocol.util.VPLogger
@@ -15,10 +18,13 @@ import java.util.Locale
 @HiltAndroidApp
 class VitaSleepApp : Application() {
 
+    private val prefs by lazy {
+        getSharedPreferences("vitasleep_crash", Context.MODE_PRIVATE)
+    }
+
     override fun onCreate() {
         super.onCreate()
 
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
                 val sw = StringWriter()
@@ -27,6 +33,7 @@ class VitaSleepApp : Application() {
                 pw.println("=== VitaSleep Crash Log ===")
                 pw.println("Time: ${sdf.format(Date())}")
                 pw.println("Thread: ${thread.name}")
+                pw.println("PID: ${android.os.Process.myPid()}")
                 pw.println("Exception: ${throwable.javaClass.name}")
                 pw.println("Message: ${throwable.message}")
                 pw.println()
@@ -52,15 +59,28 @@ class VitaSleepApp : Application() {
                 val crashLog = sw.toString()
                 Log.e("VitaSleepCrash", crashLog)
 
-                val file = File(filesDir, "last_crash.log")
-                file.writeText(crashLog)
+                prefs.edit()
+                    .putString("last_crash", crashLog)
+                    .putLong("last_crash_time", System.currentTimeMillis())
+                    .apply()
 
-                val historyFile = File(filesDir, "crash_history.log")
-                val historyEntry = "\n\n${"=".repeat(60)}\n${crashLog}"
-                historyFile.appendText(historyEntry)
+                try {
+                    val file = File(filesDir, "last_crash.log")
+                    file.writeText(crashLog)
+                } catch (_: Throwable) {
+                }
+
+                try {
+                    val historyFile = File(filesDir, "crash_history.log")
+                    val historyEntry = "\n\n${"=".repeat(60)}\n${crashLog}"
+                    historyFile.appendText(historyEntry)
+                } catch (_: Throwable) {
+                }
             } catch (_: Throwable) {
             }
-            defaultHandler?.uncaughtException(thread, throwable)
+
+            android.os.Process.killProcess(android.os.Process.myPid())
+            System.exit(10)
         }
 
         try {
@@ -79,6 +99,8 @@ class VitaSleepApp : Application() {
     }
 
     fun getLastCrashLog(): String? {
+        val fromPrefs = prefs.getString("last_crash", null)
+        if (fromPrefs != null) return fromPrefs
         return try {
             val file = File(filesDir, "last_crash.log")
             if (file.exists()) file.readText() else null
@@ -88,9 +110,12 @@ class VitaSleepApp : Application() {
     }
 
     fun clearCrashLog() {
+        prefs.edit().remove("last_crash").remove("last_crash_time").apply()
         try {
             File(filesDir, "last_crash.log").delete()
         } catch (_: Throwable) {
         }
     }
+
+    val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
 }

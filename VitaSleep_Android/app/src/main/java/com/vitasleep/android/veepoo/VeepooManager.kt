@@ -4,12 +4,14 @@ import android.content.Context
 import android.util.Log
 import com.veepoo.protocol.VPOperateManager
 import com.veepoo.protocol.listener.base.IABleConnectStatusListener
+import com.veepoo.protocol.listener.base.IABluetoothStateListener
 import com.veepoo.protocol.listener.base.IBleWriteResponse
 import com.veepoo.protocol.listener.base.IConnectResponse
 import com.veepoo.protocol.listener.base.INotifyResponse
 import com.veepoo.protocol.listener.data.*
 import com.veepoo.protocol.model.datas.*
 import com.veepoo.protocol.model.settings.CustomSettingData
+import com.veepoo.protocol.util.VPLogger
 import com.inuker.bluetooth.library.Code
 import com.inuker.bluetooth.library.Constants
 import com.inuker.bluetooth.library.model.BleGattProfile
@@ -52,6 +54,9 @@ class VeepooManager private constructor(
 
     private val scannedMap = mutableMapOf<String, ScannedDevice>()
 
+    @Volatile
+    private var sdkInitialized = false
+
     private val searchResponse = object : SearchResponse {
         override fun onSearchStarted() {
             _isScanning.value = true
@@ -83,6 +88,7 @@ class VeepooManager private constructor(
     private val connectStatusListener = object : IABleConnectStatusListener() {
         override fun onConnectStatusChanged(mac: String, status: Int) {
             try {
+                Log.d(TAG, "onConnectStatusChanged: mac=$mac status=$status")
                 if (status == Constants.STATUS_DISCONNECTED) {
                     _connectionState.value = ConnectionState.Disconnected
                     _deviceBattery.value = null
@@ -99,9 +105,46 @@ class VeepooManager private constructor(
 
     fun initialize() {
         try {
+            Log.d(TAG, "initialize: starting SDK init")
             vpOperateManager.init(context)
+            sdkInitialized = true
+            Log.d(TAG, "initialize: SDK init success")
+
+            try {
+                vpOperateManager.setDeviceShowConfirm(true)
+                Log.d(TAG, "initialize: setDeviceShowConfirm(true)")
+            } catch (e: Throwable) {
+                Log.w(TAG, "setDeviceShowConfirm failed", e)
+            }
+
+            VPLogger.setDebug(true)
+
+            try {
+                vpOperateManager.registerBluetoothStateListener(object : IABluetoothStateListener() {
+                    override fun onBluetoothStateChanged(openOrClosed: Boolean) {
+                        Log.d(TAG, "Bluetooth state changed: open=$openOrClosed")
+                    }
+                })
+            } catch (e: Throwable) {
+                Log.w(TAG, "registerBluetoothStateListener failed", e)
+            }
+
+            Log.d(TAG, "initialize: completed successfully")
         } catch (e: Throwable) {
             Log.e(TAG, "SDK init failed", e)
+            sdkInitialized = false
+        }
+    }
+
+    private fun ensureInit() {
+        if (!sdkInitialized) {
+            Log.w(TAG, "SDK not initialized, re-initializing...")
+            try {
+                vpOperateManager.init(context)
+                sdkInitialized = true
+            } catch (e: Throwable) {
+                Log.e(TAG, "SDK re-init failed", e)
+            }
         }
     }
 
@@ -109,9 +152,11 @@ class VeepooManager private constructor(
 
     fun startScan() {
         if (_isScanning.value) return
+        ensureInit()
         scannedMap.clear()
         _scannedDevices.value = emptyList()
         try {
+            Log.d(TAG, "startScan: calling startScanDevice")
             vpOperateManager.startScanDevice(searchResponse)
         } catch (e: Throwable) {
             Log.e(TAG, "startScan failed", e)
@@ -130,25 +175,33 @@ class VeepooManager private constructor(
     }
 
     fun connectDevice(mac: String, name: String = "Unknown") {
+        Log.d(TAG, "connectDevice: mac=$mac name=$name")
         stopScan()
         _connectionState.value = ConnectionState.Connecting
         connectedMac = mac
         connectedName = name
 
+        ensureInit()
+
         try {
+            Log.d(TAG, "connectDevice: registerConnectStatusListener")
             vpOperateManager.registerConnectStatusListener(mac, connectStatusListener)
         } catch (e: Throwable) {
             Log.e(TAG, "registerConnectStatusListener failed", e)
         }
 
         try {
+            Log.d(TAG, "connectDevice: calling vpOperateManager.connectDevice")
             vpOperateManager.connectDevice(mac, name, object : IConnectResponse {
                 override fun connectState(code: Int, profile: BleGattProfile, isoadModel: Boolean) {
+                    Log.d(TAG, "IConnectResponse.connectState: code=$code isoadModel=$isoadModel")
                     try {
                         if (code == Code.REQUEST_SUCCESS) {
                             isOadModel = isoadModel
+                            Log.d(TAG, "connectState: SUCCESS")
                         } else {
-                            _connectionState.value = ConnectionState.Error("连接失败")
+                            Log.e(TAG, "connectState: FAILED code=$code")
+                            _connectionState.value = ConnectionState.Error("连接失败 (code=$code)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "IConnectResponse.connectState error", e)
@@ -156,34 +209,44 @@ class VeepooManager private constructor(
                 }
             }, object : INotifyResponse {
                 override fun notifyState(state: Int) {
+                    Log.d(TAG, "INotifyResponse.notifyState: state=$state")
                     try {
                         if (state == Code.REQUEST_SUCCESS) {
+                            Log.d(TAG, "notifyState: SUCCESS, calling confirmDevicePwd")
                             _connectionState.value = ConnectionState.Confirming
                             confirmDevicePwd()
                         } else {
-                            _connectionState.value = ConnectionState.Error("通知服务注册失败")
+                            Log.e(TAG, "notifyState: FAILED state=$state")
+                            _connectionState.value = ConnectionState.Error("通知服务注册失败 (state=$state)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "INotifyResponse.notifyState error", e)
-                        _connectionState.value = ConnectionState.Error("通知服务异常: ${e.message}")
+                        _connectionState.value = ConnectionState.Error("通知服务异常: ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             })
+            Log.d(TAG, "connectDevice: SDK call returned without exception")
         } catch (e: Throwable) {
-            Log.e(TAG, "connectDevice failed", e)
-            _connectionState.value = ConnectionState.Error("连接异常: ${e.message}")
+            Log.e(TAG, "connectDevice FAILED", e)
+            _connectionState.value = ConnectionState.Error("连接异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
     private fun confirmDevicePwd() {
+        Log.d(TAG, "confirmDevicePwd: start")
         try {
             vpOperateManager.confirmDevicePwd(
                 object : IBleWriteResponse {
-                    override fun onResponse(code: Int) {}
+                    override fun onResponse(code: Int) {
+                        Log.d(TAG, "confirmDevicePwd writeResponse: code=$code")
+                    }
                 },
                 object : IPwdDataListener {
-                    override fun onPwdDataChange(pwdData: PwdData) {}
+                    override fun onPwdDataChange(pwdData: PwdData) {
+                        Log.d(TAG, "onPwdDataChange")
+                    }
                     override fun onConnectionConfirmTimeout() {
+                        Log.e(TAG, "onConnectionConfirmTimeout")
                         try {
                             _connectionState.value = ConnectionState.Error("密码确认超时")
                         } catch (e: Throwable) {
@@ -193,24 +256,40 @@ class VeepooManager private constructor(
                 },
                 object : IDeviceFuctionDataListener {
                     override fun onFunctionSupportDataChange(functionSupport: FunctionDeviceSupportData) {
+                        Log.d(TAG, "onFunctionSupportDataChange")
                         try {
                             watchDataDay = functionSupport.wathcDay
                         } catch (e: Throwable) {
                             Log.e(TAG, "onFunctionSupportDataChange error", e)
                         }
                     }
-                    override fun onDeviceFunctionPackage1Report(p1: DeviceFunctionPackage1) {}
-                    override fun onDeviceFunctionPackage2Report(p2: DeviceFunctionPackage2) {}
-                    override fun onDeviceFunctionPackage3Report(p3: DeviceFunctionPackage3) {}
-                    override fun onDeviceFunctionPackage4Report(p4: DeviceFunctionPackage4) {}
-                    override fun onDeviceFunctionPackage5Report(p5: DeviceFunctionPackage5) {}
+                    override fun onDeviceFunctionPackage1Report(p1: DeviceFunctionPackage1) {
+                        Log.d(TAG, "onDeviceFunctionPackage1Report")
+                    }
+                    override fun onDeviceFunctionPackage2Report(p2: DeviceFunctionPackage2) {
+                        Log.d(TAG, "onDeviceFunctionPackage2Report")
+                    }
+                    override fun onDeviceFunctionPackage3Report(p3: DeviceFunctionPackage3) {
+                        Log.d(TAG, "onDeviceFunctionPackage3Report")
+                    }
+                    override fun onDeviceFunctionPackage4Report(p4: DeviceFunctionPackage4) {
+                        Log.d(TAG, "onDeviceFunctionPackage4Report")
+                    }
+                    override fun onDeviceFunctionPackage5Report(p5: DeviceFunctionPackage5) {
+                        Log.d(TAG, "onDeviceFunctionPackage5Report")
+                    }
                 },
                 object : ISocialMsgDataListener {
-                    override fun onSocialMsgSupportDataChange(data: FunctionSocailMsgData) {}
-                    override fun onSocialMsgSupportDataChange2(data: FunctionSocailMsgData) {}
+                    override fun onSocialMsgSupportDataChange(data: FunctionSocailMsgData) {
+                        Log.d(TAG, "onSocialMsgSupportDataChange")
+                    }
+                    override fun onSocialMsgSupportDataChange2(data: FunctionSocailMsgData) {
+                        Log.d(TAG, "onSocialMsgSupportDataChange2")
+                    }
                 },
                 object : ICustomSettingDataListener {
                     override fun OnSettingDataChange(customSettingData: CustomSettingData) {
+                        Log.d(TAG, "OnSettingDataChange: CONNECTED!")
                         try {
                             _connectionState.value = ConnectionState.Connected(
                                 mac = connectedMac ?: "",
@@ -224,9 +303,10 @@ class VeepooManager private constructor(
                 "0000",
                 true
             )
+            Log.d(TAG, "confirmDevicePwd: SDK call returned without exception")
         } catch (e: Throwable) {
-            Log.e(TAG, "confirmDevicePwd failed", e)
-            _connectionState.value = ConnectionState.Error("密码确认异常: ${e.message}")
+            Log.e(TAG, "confirmDevicePwd FAILED", e)
+            _connectionState.value = ConnectionState.Error("密码确认异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
