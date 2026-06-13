@@ -93,3 +93,5 @@ curl -X POST http://localhost:3000/api/metrics/update/test \
 
 **创建时间**: 2026-05-17  
 **文档**: `PROJECT_PLAN.md`
+
+Rebuild v1.0.6
