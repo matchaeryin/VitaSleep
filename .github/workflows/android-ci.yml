@@ -14,20 +14,26 @@ jobs:
 
       - name: Debug - Show source files
         run: |
-          echo "=== build.gradle version ==="
-          grep -n "version" VitaSleep_Android/app/build.gradle
-          echo ""
-          echo "=== AndroidManifest.xml service declarations ==="
-          grep -n "service\|Service\|FOREGROUND" VitaSleep_Android/app/src/main/AndroidManifest.xml
-          echo ""
-          echo "=== VitaSleepApp.kt crash logging ==="
-          grep -n "crash\|Crash\|last_crash\|PrintWriter" VitaSleep_Android/app/src/main/java/com/vitasleep/android/VitaSleepApp.kt
-          echo ""
-          echo "=== DeviceScreen.kt crash UI ==="
-          grep -n "crash\|Crash\|VitaSleepApp\|crashExpanded" VitaSleep_Android/app/src/main/java/com/vitasleep/android/ui/screens/device/DeviceScreen.kt | head -10
-          echo ""
           echo "=== Git log ==="
-          git log --oneline -5
+          git log --oneline -10
+          echo ""
+          echo "=== Git show HEAD build.gradle (first 30 lines) ==="
+          git show HEAD:VitaSleep_Android/app/build.gradle | head -30
+          echo ""
+          echo "=== Actual build.gradle on disk (first 30 lines) ==="
+          head -30 VitaSleep_Android/app/build.gradle
+          echo ""
+          echo "=== VitaSleepApp.kt on disk (first 40 lines) ==="
+          head -40 VitaSleep_Android/app/src/main/java/com/vitasleep/android/VitaSleepApp.kt
+          echo ""
+          echo "=== AndroidManifest.xml on disk ==="
+          cat VitaSleep_Android/app/src/main/AndroidManifest.xml
+          echo ""
+          echo "=== Directory listing ==="
+          ls -la VitaSleep_Android/app/src/main/java/com/vitasleep/android/
+          echo ""
+          echo "=== Git diff HEAD VitaSleep_Android/app/build.gradle ==="
+          git diff HEAD -- VitaSleep_Android/app/build.gradle | head -30
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
