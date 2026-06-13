@@ -123,60 +123,95 @@ fun HealthScreen(
                 }
             }
             else -> {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    item {
-                        uiState.battery?.let { BatteryRingCard(level = it) }
-                    }
+                val hasData = uiState.battery != null || uiState.heartRate != null
+                        || uiState.bloodPressure != null || uiState.cardioScore != null
+                        || uiState.hrv != null
 
-                    item {
-                        uiState.cardioScore?.let { score ->
-                            CardioIndexCard(
-                                score = score,
-                                level = uiState.cardioLevel ?: ""
-                            )
+                if (hasData) {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        item {
+                            uiState.battery?.let { BatteryRingCard(level = it) }
+                        }
+
+                        item {
+                            uiState.cardioScore?.let { score ->
+                                CardioIndexCard(
+                                    score = score,
+                                    level = uiState.cardioLevel ?: ""
+                                )
+                            }
+                        }
+
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                uiState.heartRate?.let {
+                                    MetricCard(
+                                        title = "心率",
+                                        value = "$it",
+                                        unit = "bpm",
+                                        icon = Icons.Default.Favorite,
+                                        color = RoseRed,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                uiState.bloodPressure?.let { bp ->
+                                    MetricCard(
+                                        title = "血压",
+                                        value = bp,
+                                        unit = "mmHg",
+                                        icon = Icons.Default.Speed,
+                                        color = SkyBlue,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        item {
+                            uiState.hrv?.let { hrv ->
+                                MetricCard(
+                                    title = "HRV 心率变异性",
+                                    value = hrv,
+                                    unit = "",
+                                    icon = Icons.Default.ShowChart,
+                                    color = IceBlue,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
-
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            uiState.heartRate?.let {
-                                MetricCard(
-                                    title = "心率",
-                                    value = "$it",
-                                    unit = "bpm",
-                                    icon = Icons.Default.Favorite,
-                                    color = RoseRed,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            uiState.bloodPressure?.let { bp ->
-                                MetricCard(
-                                    title = "血压",
-                                    value = bp,
-                                    unit = "mmHg",
-                                    icon = Icons.Default.Speed,
-                                    color = SkyBlue,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
-
-                    item {
-                        uiState.hrv?.let { hrv ->
-                            MetricCard(
-                                title = "HRV 心率变异性",
-                                value = hrv,
-                                unit = "",
-                                icon = Icons.Default.ShowChart,
-                                color = IceBlue,
-                                modifier = Modifier.fillMaxWidth()
+                            Icon(
+                                Icons.Default.MonitorHeart,
+                                contentDescription = null,
+                                tint = TextDim,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "暂无健康数据",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "请先在设备页连接手表并同步数据",
+                                fontSize = 14.sp,
+                                color = TextDim
                             )
                         }
                     }
