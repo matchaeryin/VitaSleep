@@ -14,8 +14,8 @@ android {
         applicationId "com.vitasleep.android"
         minSdk 26
         targetSdk 34
-        versionCode 14
-        versionName "1.0.14"
+        versionCode 15
+        versionName "1.0.15"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -67,6 +67,12 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.aar', '*.jar'], exclude: ['gson-*.jar'], dir: 'libs')
+
+    // Veepoo SDK (vpprotocol) requires the Nordic/Juul mcumgr-android library
+    // (io.runtime.mcumgr) at runtime for its McuMgrOtaManager, otherwise
+    // NoClassDefFoundError: io/runtime/mcumgr/ble/McuMgrBleTransport on connect.
+    implementation 'com.github.runtimeco.mcumgr-android:mcumgr-ble:0.11.0'
+    implementation 'com.github.runtimeco.mcumgr-android:mcumgr-core:0.11.0'
 
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'androidx.core:core-ktx:1.12.0'
