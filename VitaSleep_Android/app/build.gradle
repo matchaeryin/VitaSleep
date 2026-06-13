@@ -14,12 +14,16 @@ android {
         applicationId "com.vitasleep.android"
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName "1.0.9"
+        versionCode 10
+        versionName "1.0.10"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
+        }
+
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
 
         def backendUrl = project.findProperty("BACKEND_BASE_URL") ?: "http://36.103.199.229:8888"
@@ -46,6 +50,7 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
+        freeCompilerArgs += ["-Xjvm-default=all"]
     }
 
     buildFeatures {
@@ -61,18 +66,18 @@ android {
 }
 
 dependencies {
-    // ─── Veepoo SDK ───
+    configurations {
+        all {
+            exclude group: 'com.google.code.gson', module: 'gson'
+        }
+    }
+
     implementation fileTree(include: ['*.aar', '*.jar'], dir: 'libs')
 
-    // ─── Gson ───
-    implementation 'com.google.code.gson:gson:2.10.1'
-
-    // ─── AndroidX Core ───
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
     implementation 'androidx.activity:activity-compose:1.8.1'
 
-    // ─── Compose BOM ───
     implementation platform('androidx.compose:compose-bom:2024.10.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
@@ -80,32 +85,27 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended'
 
-    // ─── Navigation ───
     implementation 'androidx.navigation:navigation-compose:2.7.5'
 
-    // ─── Lifecycle ───
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.6.2'
 
-    // ─── Hilt ───
     implementation 'com.google.dagger:hilt-android:2.56.2'
     ksp 'com.google.dagger:hilt-compiler:2.56.2'
     implementation 'androidx.hilt:hilt-navigation-compose:1.1.0'
 
-    // ─── Retrofit + OkHttp ───
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     implementation 'com.squareup.okhttp3:okhttp-sse:4.12.0'
 
-    // ─── Coroutines ───
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
-    // ─── DataStore ───
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
 
-    // ─── Testing ───
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
+
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
