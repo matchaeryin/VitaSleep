@@ -74,6 +74,16 @@ dependencies {
     implementation 'com.github.runtimeco.mcumgr-android:mcumgr-ble:0.11.0'
     implementation 'com.github.runtimeco.mcumgr-android:mcumgr-core:0.11.0'
 
+    // mcumgr-ble 0.11.0 (from JitPack) ships a POM WITHOUT its own runtime
+    // dependencies (JitPack dropped them), so they must be declared here.
+    // Versions pinned to exactly what mcumgr-ble 0.11.0 was compiled against
+    // (see mcumgr-android/mcumgr-ble/build.gradle) to avoid NoSuchMethodError.
+    //   - no.nordicsemi.android:ble  -> McuMgrBleTransport extends BleManager.
+    //     Without it: NoClassDefFoundError: no/nordicsemi/android/ble/BleManager.
+    //   - slf4j-api -> mcumgr logs via org.slf4j.Logger at runtime.
+    implementation 'no.nordicsemi.android:ble:2.2.3'
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
