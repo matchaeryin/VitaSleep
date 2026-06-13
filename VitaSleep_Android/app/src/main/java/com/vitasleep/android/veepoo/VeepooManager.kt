@@ -21,6 +21,9 @@ import com.vitasleep.android.data.model.VeepooOriginRecord
 import com.vitasleep.android.data.model.VeepooSleepDataRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.BufferedReader
+import java.io.File
+import java.io.InputStreamReader
 import java.util.Locale
 
 class VeepooManager private constructor(
@@ -57,6 +60,8 @@ class VeepooManager private constructor(
     @Volatile
     private var sdkInitialized = false
 
+    private var logcatProcess: Process? = null
+
     private val searchResponse = object : SearchResponse {
         override fun onSearchStarted() {
             _isScanning.value = true
@@ -90,6 +95,7 @@ class VeepooManager private constructor(
             try {
                 Log.d(TAG, "onConnectStatusChanged: mac=$mac status=$status")
                 if (status == Constants.STATUS_DISCONNECTED) {
+                    stopRealtimeLogcat()
                     VeepooService.stop(context)
                     _connectionState.value = ConnectionState.Disconnected
                     _deviceBattery.value = null
@@ -182,7 +188,7 @@ class VeepooManager private constructor(
         connectedMac = mac
         connectedName = name
 
-        VeepooService.start(context)
+        startRealtimeLogcat()
 
         ensureInit()
 
@@ -201,10 +207,15 @@ class VeepooManager private constructor(
                     try {
                         if (code == Code.REQUEST_SUCCESS) {
                             isOadModel = isoadModel
-                            Log.d(TAG, "connectState: SUCCESS")
+                            Log.d(TAG, "connectState: SUCCESS, starting VeepooService")
+                            try {
+                                VeepooService.start(context)
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "VeepooService.start failed after connect success", e)
+                            }
                         } else {
                             Log.e(TAG, "connectState: FAILED code=$code")
-                            VeepooService.stop(context)
+                            stopRealtimeLogcat()
                             _connectionState.value = ConnectionState.Error("连接失败 (code=$code)")
                         }
                     } catch (e: Throwable) {
@@ -221,11 +232,13 @@ class VeepooManager private constructor(
                             confirmDevicePwd()
                         } else {
                             Log.e(TAG, "notifyState: FAILED state=$state")
+                            stopRealtimeLogcat()
                             VeepooService.stop(context)
                             _connectionState.value = ConnectionState.Error("通知服务注册失败 (state=$state)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "INotifyResponse.notifyState error", e)
+                        stopRealtimeLogcat()
                         VeepooService.stop(context)
                         _connectionState.value = ConnectionState.Error("通知服务异常: ${e.javaClass.simpleName}: ${e.message}")
                     }
@@ -234,7 +247,7 @@ class VeepooManager private constructor(
             Log.d(TAG, "connectDevice: SDK call returned without exception")
         } catch (e: Throwable) {
             Log.e(TAG, "connectDevice FAILED", e)
-            VeepooService.stop(context)
+            stopRealtimeLogcat()
             _connectionState.value = ConnectionState.Error("连接异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
@@ -255,6 +268,7 @@ class VeepooManager private constructor(
                     override fun onConnectionConfirmTimeout() {
                         Log.e(TAG, "onConnectionConfirmTimeout")
                         try {
+                            stopRealtimeLogcat()
                             VeepooService.stop(context)
                             _connectionState.value = ConnectionState.Error("密码确认超时")
                         } catch (e: Throwable) {
@@ -299,6 +313,7 @@ class VeepooManager private constructor(
                     override fun OnSettingDataChange(customSettingData: CustomSettingData) {
                         Log.d(TAG, "OnSettingDataChange: CONNECTED!")
                         try {
+                            stopRealtimeLogcat()
                             _connectionState.value = ConnectionState.Connected(
                                 mac = connectedMac ?: "",
                                 name = connectedName ?: ""
@@ -314,12 +329,14 @@ class VeepooManager private constructor(
             Log.d(TAG, "confirmDevicePwd: SDK call returned without exception")
         } catch (e: Throwable) {
             Log.e(TAG, "confirmDevicePwd FAILED", e)
+            stopRealtimeLogcat()
             VeepooService.stop(context)
             _connectionState.value = ConnectionState.Error("密码确认异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
     fun disconnect() {
+        stopRealtimeLogcat()
         try {
             vpOperateManager.disconnectWatch(defaultWriteResponse)
         } catch (e: Throwable) {
@@ -513,6 +530,41 @@ class VeepooManager private constructor(
             remSleepMin = (data["rem_sleep_min"] as? Number)?.toInt() ?: 0,
             awakeMin = (data["awake_min"] as? Number)?.toInt() ?: 0
         )
+    }
+
+    private fun startRealtimeLogcat() {
+        try {
+            stopRealtimeLogcat()
+            val pid = android.os.Process.myPid()
+            val file = File(context.filesDir, "realtime_logcat.txt")
+            file.delete()
+            logcatProcess = Runtime.getRuntime().exec(
+                arrayOf("logcat", "-v", "threadtime", "--pid=$pid")
+            )
+            Thread {
+                try {
+                    val reader = BufferedReader(InputStreamReader(logcatProcess?.inputStream))
+                    val writer = file.bufferedWriter()
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        writer.write(line)
+                        writer.newLine()
+                        writer.flush()
+                    }
+                    writer.close()
+                } catch (_: Throwable) {}
+            }.start()
+            Log.d(TAG, "startRealtimeLogcat: started for PID=$pid")
+        } catch (e: Throwable) {
+            Log.e(TAG, "startRealtimeLogcat failed", e)
+        }
+    }
+
+    private fun stopRealtimeLogcat() {
+        try {
+            logcatProcess?.destroy()
+            logcatProcess = null
+        } catch (_: Throwable) {}
     }
 
     companion object {

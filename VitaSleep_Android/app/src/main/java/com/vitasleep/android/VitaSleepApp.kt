@@ -27,7 +27,13 @@ class VitaSleepApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        capturePreviousLogcat()
+        val currentPid = android.os.Process.myPid()
+        val prevPid = prefs.getInt("app_pid", -1)
+
+        capturePreviousLogcat(prevPid)
+        checkRealtimeLogcatFile()
+
+        prefs.edit().putInt("app_pid", currentPid).apply()
 
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
@@ -89,68 +95,40 @@ class VitaSleepApp : Application() {
         }
     }
 
-    private fun capturePreviousLogcat() {
+    private fun capturePreviousLogcat(prevPid: Int) {
         try {
-            val pid = android.os.Process.myPid().toString()
+            if (prevPid <= 0) return
+
             val process = Runtime.getRuntime().exec(
-                arrayOf("logcat", "-d", "-t", "2000")
+                arrayOf("logcat", "-d", "--pid=$prevPid", "-t", "3000")
             )
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val sb = StringBuilder()
             var line: String?
             while (reader.readLine().also { line = it } != null) {
-                val l = line!!
-                if (l.contains("FATAL") ||
-                    l.contains("signal") ||
-                    l.contains("SIGSEGV") ||
-                    l.contains("SIGABRT") ||
-                    l.contains("SIGBUS") ||
-                    l.contains("tombstone") ||
-                    l.contains("CRASH") ||
-                    l.contains("died") ||
-                    l.contains("kill") ||
-                    l.contains("Force finishing") ||
-                    l.contains("Force finishing") ||
-                    l.contains("Low Memory") ||
-                    l.contains("ANR") ||
-                    l.contains("VitaSleep") ||
-                    l.contains("VeepooManager") ||
-                    l.contains("VeepooService") ||
-                    l.contains("VPOperateManager") ||
-                    l.contains("BluetoothService") ||
-                    l.contains("inuker") ||
-                    l.contains("veepoo") ||
-                    l.contains("vitasleep") ||
-                    l.contains("NoClassDef") ||
-                    l.contains("UnsatisfiedLink") ||
-                    l.contains("NoSuchMethod") ||
-                    l.contains("IllegalAccess") ||
-                    l.contains("ForegroundService") ||
-                    l.contains("SecurityException") ||
-                    l.contains("AndroidRuntime")
-                ) {
-                    sb.appendLine(l)
-                }
+                sb.appendLine(line)
             }
             reader.close()
             process.waitFor()
 
             val logcat = sb.toString().trim()
             if (logcat.isNotEmpty()) {
-                val existing = prefs.getString("logcat_capture", "")
-                val newLog = StringBuilder()
-                newLog.appendLine("=== Logcat Capture (${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}) PID=$pid ===")
-                newLog.appendLine(logcat)
-                newLog.appendLine()
-
-                val combined = if (existing.isNullOrEmpty()) {
-                    newLog.toString()
-                } else {
-                    newLog.toString() + "\n" + existing
+                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                val newLog = buildString {
+                    appendLine("=== Logcat Capture (${sdf.format(Date())}) PID=$prevPid ===")
+                    appendLine(logcat)
+                    appendLine()
                 }
 
-                val trimmed = if (combined.length > 30000) {
-                    combined.take(30000)
+                val existing = prefs.getString("logcat_capture", "")
+                val combined = if (existing.isNullOrEmpty()) {
+                    newLog
+                } else {
+                    newLog + "\n" + existing
+                }
+
+                val trimmed = if (combined.length > 50000) {
+                    combined.take(50000)
                 } else {
                     combined
                 }
@@ -164,16 +142,50 @@ class VitaSleepApp : Application() {
         }
     }
 
-    fun getLastCrashLog(): String? {
-        val logcatCapture = prefs.getString("logcat_capture", null)
-        val javaCrash = prefs.getString("last_crash", null)
+    private fun checkRealtimeLogcatFile() {
+        try {
+            val file = File(filesDir, "realtime_logcat.txt")
+            if (file.exists() && file.length() > 0) {
+                val content = file.readText()
+                if (content.isNotBlank()) {
+                    val existing = prefs.getString("realtime_logcat", "")
+                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    val newEntry = buildString {
+                        appendLine("=== Realtime Logcat (${sdf.format(Date())}) ===")
+                        appendLine(content.take(50000))
+                    }
+                    val combined = if (existing.isNullOrEmpty()) {
+                        newEntry
+                    } else {
+                        newEntry + "\n" + existing
+                    }
+                    prefs.edit()
+                        .putString("realtime_logcat", combined.take(50000))
+                        .apply()
+                }
+            }
+            file.delete()
+        } catch (e: Throwable) {
+            Log.e("VitaSleepApp", "checkRealtimeLogcatFile failed", e)
+        }
+    }
 
+    fun getLastCrashLog(): String? {
         val parts = mutableListOf<String>()
+
+        val javaCrash = prefs.getString("last_crash", null)
         if (!javaCrash.isNullOrEmpty()) {
             parts.add(javaCrash)
         }
+
+        val logcatCapture = prefs.getString("logcat_capture", null)
         if (!logcatCapture.isNullOrEmpty()) {
             parts.add("\n=== System/Logcat Crash Info ===\n$logcatCapture")
+        }
+
+        val realtimeLogcat = prefs.getString("realtime_logcat", null)
+        if (!realtimeLogcat.isNullOrEmpty()) {
+            parts.add("\n=== Realtime Logcat (pre-crash) ===\n$realtimeLogcat")
         }
 
         return if (parts.isNotEmpty()) parts.joinToString("\n\n") else null
@@ -184,6 +196,7 @@ class VitaSleepApp : Application() {
             .remove("last_crash")
             .remove("last_crash_time")
             .remove("logcat_capture")
+            .remove("realtime_logcat")
             .apply()
         try {
             File(filesDir, "last_crash.log").delete()
