@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -105,12 +104,11 @@ fun DeviceScreen(
                             color = Color(0xFFB71C1C),
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
-                            maxLines = 30,
-                            overflow = TextOverflow.Ellipsis,
+                            softWrap = true,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
-                                .heightIn(max = 300.dp)
+                                .heightIn(max = 360.dp)
                         )
                     }
                 }

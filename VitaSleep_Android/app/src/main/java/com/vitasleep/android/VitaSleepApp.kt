@@ -31,6 +31,7 @@ class VitaSleepApp : Application() {
         val prevPid = prefs.getInt("app_pid", -1)
 
         capturePreviousLogcat(prevPid)
+        captureCrashBuffer(prevPid)
         checkRealtimeLogcatFile()
 
         prefs.edit().putInt("app_pid", currentPid).apply()
@@ -142,6 +143,49 @@ class VitaSleepApp : Application() {
         }
     }
 
+    private fun captureCrashBuffer(prevPid: Int) {
+        try {
+            if (prevPid <= 0) return
+
+            val process = Runtime.getRuntime().exec(
+                arrayOf("logcat", "-d", "-b", "crash", "-t", "500")
+            )
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val sb = StringBuilder()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                val l = line ?: continue
+                if (l.contains("pid $prevPid") || l.contains("vitasleep", ignoreCase = true) ||
+                    l.contains("Fatal signal") || l.contains("SIGSEGV") ||
+                    l.contains("SIGABRT") || l.contains("tombstone") ||
+                    l.contains("abort message") || l.contains("backtrace:")
+                ) {
+                    sb.appendLine(l)
+                }
+            }
+            reader.close()
+            process.waitFor()
+
+            val crashBuf = sb.toString().trim()
+            if (crashBuf.isNotEmpty()) {
+                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                val newLog = buildString {
+                    appendLine("=== Native Crash Buffer (${sdf.format(Date())}) PID=$prevPid ===")
+                    appendLine(crashBuf)
+                    appendLine()
+                }
+
+                val existing = prefs.getString("crash_buffer", "")
+                val combined = if (existing.isNullOrEmpty()) newLog else "$newLog\n$existing"
+                prefs.edit()
+                    .putString("crash_buffer", combined.take(50000))
+                    .apply()
+            }
+        } catch (e: Throwable) {
+            Log.e("VitaSleepApp", "crash buffer capture failed", e)
+        }
+    }
+
     private fun checkRealtimeLogcatFile() {
         try {
             val file = File(filesDir, "realtime_logcat.txt")
@@ -188,6 +232,11 @@ class VitaSleepApp : Application() {
             parts.add("\n=== Realtime Logcat (pre-crash) ===\n$realtimeLogcat")
         }
 
+        val crashBuffer = prefs.getString("crash_buffer", null)
+        if (!crashBuffer.isNullOrEmpty()) {
+            parts.add("\n=== Native Crash Buffer ===\n$crashBuffer")
+        }
+
         return if (parts.isNotEmpty()) parts.joinToString("\n\n") else null
     }
 
@@ -197,6 +246,7 @@ class VitaSleepApp : Application() {
             .remove("last_crash_time")
             .remove("logcat_capture")
             .remove("realtime_logcat")
+            .remove("crash_buffer")
             .apply()
         try {
             File(filesDir, "last_crash.log").delete()

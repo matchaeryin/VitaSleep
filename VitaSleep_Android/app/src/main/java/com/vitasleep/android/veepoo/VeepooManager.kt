@@ -11,7 +11,6 @@ import com.veepoo.protocol.listener.base.INotifyResponse
 import com.veepoo.protocol.listener.data.*
 import com.veepoo.protocol.model.datas.*
 import com.veepoo.protocol.model.settings.CustomSettingData
-import com.veepoo.protocol.util.VPLogger
 import com.inuker.bluetooth.library.Code
 import com.inuker.bluetooth.library.Constants
 import com.inuker.bluetooth.library.model.BleGattProfile
@@ -111,47 +110,33 @@ class VeepooManager private constructor(
     }
 
     fun initialize() {
+        Log.d(TAG, "initialize: SDK already initialized by VitaSleepApp.onCreate, skipping duplicate init")
+        sdkInitialized = true
+
         try {
-            Log.d(TAG, "initialize: starting SDK init")
-            vpOperateManager.init(context)
-            sdkInitialized = true
-            Log.d(TAG, "initialize: SDK init success")
-
-            try {
-                vpOperateManager.setDeviceShowConfirm(true)
-                Log.d(TAG, "initialize: setDeviceShowConfirm(true)")
-            } catch (e: Throwable) {
-                Log.w(TAG, "setDeviceShowConfirm failed", e)
-            }
-
-            VPLogger.setDebug(true)
-
-            try {
-                vpOperateManager.registerBluetoothStateListener(object : IABluetoothStateListener() {
-                    override fun onBluetoothStateChanged(openOrClosed: Boolean) {
-                        Log.d(TAG, "Bluetooth state changed: open=$openOrClosed")
-                    }
-                })
-            } catch (e: Throwable) {
-                Log.w(TAG, "registerBluetoothStateListener failed", e)
-            }
-
-            Log.d(TAG, "initialize: completed successfully")
+            vpOperateManager.setDeviceShowConfirm(true)
+            Log.d(TAG, "initialize: setDeviceShowConfirm(true)")
         } catch (e: Throwable) {
-            Log.e(TAG, "SDK init failed", e)
-            sdkInitialized = false
+            Log.w(TAG, "setDeviceShowConfirm failed", e)
         }
+
+        try {
+            vpOperateManager.registerBluetoothStateListener(object : IABluetoothStateListener() {
+                override fun onBluetoothStateChanged(openOrClosed: Boolean) {
+                    Log.d(TAG, "Bluetooth state changed: open=$openOrClosed")
+                }
+            })
+        } catch (e: Throwable) {
+            Log.w(TAG, "registerBluetoothStateListener failed", e)
+        }
+
+        Log.d(TAG, "initialize: completed successfully")
     }
 
     private fun ensureInit() {
         if (!sdkInitialized) {
-            Log.w(TAG, "SDK not initialized, re-initializing...")
-            try {
-                vpOperateManager.init(context)
-                sdkInitialized = true
-            } catch (e: Throwable) {
-                Log.e(TAG, "SDK re-init failed", e)
-            }
+            Log.w(TAG, "ensureInit: flag not set; trusting VitaSleepApp.onCreate init")
+            sdkInitialized = true
         }
     }
 
