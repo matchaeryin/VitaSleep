@@ -284,10 +284,10 @@ class AgentToolResult(BaseModel):
 class VeepooOriginRecord(BaseModel):
     """Veepoo 5分钟原始数据的一条记录"""
     timestamp: datetime = Field(..., description="数据采集时间")
-    heart_rate: int = Field(..., ge=30, le=200, description="心率值（5分钟平均）")
+    heart_rate: Optional[int] = Field(None, ge=30, le=200, description="心率值（5分钟平均），None 表示未测量")
     heart_rate_array: Optional[List[int]] = Field(None, description="5分钟内每秒心率数组（300个）")
-    systolic: int = Field(..., ge=60, le=220, description="收缩压（高压）")
-    diastolic: int = Field(..., ge=40, le=150, description="舒张压（低压）")
+    systolic: Optional[int] = Field(None, ge=60, le=220, description="收缩压（高压），None 表示未测量")
+    diastolic: Optional[int] = Field(None, ge=40, le=150, description="舒张压（低压），None 表示未测量")
     steps: int = Field(default=0, ge=0, description="5分钟计步数")
     sport_value: Optional[int] = Field(None, description="运动量")
     spo2: Optional[int] = Field(None, ge=70, le=100, description="血氧饱和度")

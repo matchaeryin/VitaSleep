@@ -1,7 +1,6 @@
 package com.vitasleep.android.ui.screens.sleep
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,10 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vitasleep.android.ui.components.GlassCard
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
-
-private val CardShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun SleepScreen(viewModel: SleepViewModel = hiltViewModel()) {
@@ -73,27 +71,11 @@ fun SleepScreen(viewModel: SleepViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun GlassCard(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(GlassBg, CardShape)
-            .border(1.dp, GlassBorder, CardShape)
-    ) {
-        content()
-    }
-}
-
-@Composable
 private fun SleepEmptyState(error: String?, onRetry: () -> Unit) {
     GlassCard {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(40.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Box(
                 modifier = Modifier
@@ -139,9 +121,7 @@ private fun SleepEmptyState(error: String?, onRetry: () -> Unit) {
 private fun SleepTotalCard(hours: String?, qualityScore: Float?) {
     GlassCard {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -192,9 +172,7 @@ private fun SleepStagesCard(
 ) {
     GlassCard {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 "睡眠阶段分布",

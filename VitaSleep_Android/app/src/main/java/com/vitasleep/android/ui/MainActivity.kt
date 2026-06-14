@@ -15,6 +15,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -107,6 +115,8 @@ fun MainScreen(
     val currentRoute = navBackStackEntry?.destination?.route
 
     var bluetoothEnabled by remember { mutableStateOf(veepooManager.hasBluetooth()) }
+    var showDeviceSheet by remember { mutableStateOf(false) }
+    val deviceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val requiredPermissions = MainActivity.getRequiredPermissions()
     val permissionsGranted = requiredPermissions.all {
@@ -136,7 +146,31 @@ fun MainScreen(
         )
     }
 
+    if (showDeviceSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showDeviceSheet = false },
+            sheetState = deviceSheetState
+        ) {
+            DeviceScreen(
+                onRequestPermissions = {
+                    permissionLauncher.launch(requiredPermissions)
+                },
+                onRequestEnableBluetooth = onRequestEnableBluetooth
+            )
+        }
+    }
+
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("VitaSleep") },
+                actions = {
+                    IconButton(onClick = { showDeviceSheet = true }) {
+                        Icon(Icons.Default.Watch, contentDescription = "设备")
+                    }
+                }
+            )
+        },
         bottomBar = {
             NavigationBar {
                 bottomNavItems.forEach { screen ->
@@ -158,7 +192,7 @@ fun MainScreen(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Device.route,
+            startDestination = Screen.Chat.route,
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Screen.Device.route) {

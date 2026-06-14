@@ -85,6 +85,22 @@ def _generate_blood_pressure() -> dict:
     }
 
 
+def _generate_spo2() -> dict:
+    hour = datetime.now().hour
+    if 0 <= hour < 7:
+        base = 94 + random.gauss(0, 1.5)
+    else:
+        base = 97 + random.gauss(0, 1.0)
+    spo2 = max(88, min(100, round(base)))
+    if spo2 >= 95:
+        status = "正常"
+    elif spo2 >= 90:
+        status = "偏低"
+    else:
+        status = "偏低"
+    return {"spo2": spo2, "status": status}
+
+
 def _compute_battery(hrv_score: float, activity: float) -> dict:
     f = _hour_factor()
     hour = datetime.now().hour
@@ -146,6 +162,7 @@ async def _run_one_cycle():
     hr_data = _generate_heart_rate()
     hrv_data = _generate_hrv()
     bp_data = _generate_blood_pressure()
+    spo2_data = _generate_spo2()
 
     f = _hour_factor()
     battery_data = _compute_battery(hrv_data["score"], f["activity"])
@@ -160,6 +177,7 @@ async def _run_one_cycle():
             await ingest_metric(db, USER_ID, MetricType.blood_pressure, bp_data, now)
             await ingest_metric(db, USER_ID, MetricType.battery, battery_data, now)
             await ingest_metric(db, USER_ID, MetricType.cardio_index, cardio_data, now)
+            await ingest_metric(db, USER_ID, MetricType.spo2, spo2_data, now)
 
             if 0 <= now.hour < 7:
                 sleep_data = {
@@ -180,6 +198,7 @@ async def _run_one_cycle():
 
             logger.info(f"[模拟器] 数据生成完成: HR={hr_data['bpm']} HRV={hrv_data['rmssd']} "
                        f"BP={bp_data['systolic']}/{bp_data['diastolic']} "
+                       f"SpO2={spo2_data['spo2']}% "
                        f"电量={battery_data['level']}% 心血管={cardio_data['score']}")
         except Exception as e:
             logger.error(f"[模拟器] 数据写入失败: {e}")

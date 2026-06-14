@@ -204,7 +204,7 @@ class VeepooManager private constructor(
                         } else {
                             Log.e(TAG, "connectState: FAILED code=$code")
                             stopRealtimeLogcat()
-                            _connectionState.value = ConnectionState.Error("???? (code=$code)")
+                            _connectionState.value = ConnectionState.Error("连接失败 (code=$code)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "IConnectResponse.connectState error", e)
@@ -222,13 +222,13 @@ class VeepooManager private constructor(
                             Log.e(TAG, "notifyState: FAILED state=$state")
                             stopRealtimeLogcat()
                             VeepooService.stop(context)
-                            _connectionState.value = ConnectionState.Error("???????? (state=$state)")
+                            _connectionState.value = ConnectionState.Error("通知服务注册失败 (state=$state)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "INotifyResponse.notifyState error", e)
                         stopRealtimeLogcat()
                         VeepooService.stop(context)
-                        _connectionState.value = ConnectionState.Error("??????: ${e.javaClass.simpleName}: ${e.message}")
+                        _connectionState.value = ConnectionState.Error("通知服务异常: ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             })
@@ -236,7 +236,7 @@ class VeepooManager private constructor(
         } catch (e: Throwable) {
             Log.e(TAG, "connectDevice FAILED", e)
             stopRealtimeLogcat()
-            _connectionState.value = ConnectionState.Error("????: ${e.javaClass.simpleName}: ${e.message}")
+            _connectionState.value = ConnectionState.Error("连接异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -258,7 +258,7 @@ class VeepooManager private constructor(
                         try {
                             stopRealtimeLogcat()
                             VeepooService.stop(context)
-                            _connectionState.value = ConnectionState.Error("??????")
+                            _connectionState.value = ConnectionState.Error("密码确认超时")
                         } catch (e: Throwable) {
                             Log.e(TAG, "onConnectionConfirmTimeout error", e)
                         }
@@ -319,7 +319,7 @@ class VeepooManager private constructor(
             Log.e(TAG, "confirmDevicePwd FAILED", e)
             stopRealtimeLogcat()
             VeepooService.stop(context)
-            _connectionState.value = ConnectionState.Error("??????: ${e.javaClass.simpleName}: ${e.message}")
+            _connectionState.value = ConnectionState.Error("密码确认异常: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -364,6 +364,8 @@ class VeepooManager private constructor(
         _originDataProgress.value = 0f
         _originDataReading.value = true
         val collectedOriginData = mutableListOf<Map<String, Any>>()
+        val spo2ByTimestamp = mutableMapOf<String, Int>()
+        val hrvByTimestamp = mutableMapOf<String, Int>()
 
         try {
             vpOperateManager.readOriginData(
@@ -397,11 +399,58 @@ class VeepooManager private constructor(
                         }
                     }
 
-                    override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {}
+                    override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {
+                        try {
+                            val rateCount = originHalfHourData.halfHourRateDatas?.size ?: 0
+                            val bpCount = originHalfHourData.halfHourBps?.size ?: 0
+                            val sportCount = originHalfHourData.halfHourSportDatas?.size ?: 0
+                            Log.d(TAG, "onOriginHalfHourDataChange: rate=$rateCount bp=$bpCount sport=$sportCount allStep=${originHalfHourData.allStep}")
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onOriginHalfHourDataChange error", e)
+                        }
+                    }
 
-                    override fun onOriginHRVOriginListDataChange(originHrvDataList: MutableList<HRVOriginData>) {}
+                    override fun onOriginHRVOriginListDataChange(originHrvDataList: MutableList<HRVOriginData>) {
+                        try {
+                            for (hrv in originHrvDataList) {
+                                val timeData = hrv.getmTime()
+                                val timestamp = String.format(
+                                    Locale.getDefault(),
+                                    "%04d-%02d-%02dT%02d:%02d:00",
+                                    timeData.year, timeData.month, timeData.day,
+                                    timeData.hour, timeData.minute
+                                )
+                                val value = hrv.hrvValue
+                                if (value > 0) {
+                                    hrvByTimestamp[timestamp] = value
+                                }
+                            }
+                            Log.d(TAG, "onOriginHRVOriginListDataChange: collected ${hrvByTimestamp.size} HRV points from ${originHrvDataList.size} records")
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onOriginHRVOriginListDataChange error", e)
+                        }
+                    }
 
-                    override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: MutableList<Spo2hOriginData>) {}
+                    override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: MutableList<Spo2hOriginData>) {
+                        try {
+                            for (spo2 in originSpo2hDataList) {
+                                val timeData = spo2.getmTime()
+                                val timestamp = String.format(
+                                    Locale.getDefault(),
+                                    "%04d-%02d-%02dT%02d:%02d:00",
+                                    timeData.year, timeData.month, timeData.day,
+                                    timeData.hour, timeData.minute
+                                )
+                                val value = spo2.oxygenValue
+                                if (value > 0) {
+                                    spo2ByTimestamp[timestamp] = value
+                                }
+                            }
+                            Log.d(TAG, "onOriginSpo2OriginListDataChange: collected ${spo2ByTimestamp.size} SpO2 points from ${originSpo2hDataList.size} records")
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "onOriginSpo2OriginListDataChange error", e)
+                        }
+                    }
 
                     override fun onReadOriginProgress(progress: Float) {
                         _originDataProgress.value = progress
@@ -410,8 +459,17 @@ class VeepooManager private constructor(
                     override fun onReadOriginProgressDetail(day: Int, date: String, allPackage: Int, currentPackage: Int) {}
 
                     override fun onReadOriginComplete() {
+                        val enrichedData = collectedOriginData.map { record ->
+                            val ts = record["timestamp"] as? String
+                            val mut = record.toMutableMap()
+                            ts?.let { spo2ByTimestamp[it] }?.let { mut["spo2"] = it }
+                            ts?.let { hrvByTimestamp[it] }?.let { mut["hrv"] = it }
+                            mut.toMap()
+                        }
+                        _latestOriginData.value = enrichedData
                         _originDataProgress.value = 1f
                         _originDataReading.value = false
+                        Log.d(TAG, "onReadOriginComplete: ${enrichedData.size} records enriched (spo2=${spo2ByTimestamp.size} hrv=${hrvByTimestamp.size})")
                     }
                 },
                 watchDataDay
@@ -496,7 +554,8 @@ class VeepooManager private constructor(
                     heartRate = (record["heart_rate"] as? Number)?.toInt()?.takeIf { it > 0 },
                     systolic = (record["systolic"] as? Number)?.toInt()?.takeIf { it > 0 },
                     diastolic = (record["diastolic"] as? Number)?.toInt()?.takeIf { it > 0 },
-                    steps = (record["steps"] as? Number)?.toInt() ?: 0
+                    steps = (record["steps"] as? Number)?.toInt() ?: 0,
+                    spo2 = (record["spo2"] as? Number)?.toInt()?.takeIf { it > 0 }
                 )
             } catch (e: Throwable) {
                 null

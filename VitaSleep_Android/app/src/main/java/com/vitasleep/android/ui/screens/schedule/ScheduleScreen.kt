@@ -9,7 +9,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vitasleep.android.data.model.Schedule
+import com.vitasleep.android.ui.components.EventCard
+import com.vitasleep.android.ui.components.GlassCard
+import com.vitasleep.android.ui.components.getEventTypeConfig
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
 import java.time.LocalDate
@@ -50,20 +55,19 @@ fun ScheduleScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .background(DeepBg)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp, bottom = 8.dp),
+                .padding(horizontal = Dimens.padScreen, vertical = Dimens.spaceMd),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "日程管理",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = OnBackground
+                text = "日程",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
             )
             IconButton(
                 onClick = { showAddDialog = true },
@@ -94,34 +98,13 @@ fun ScheduleScreen(
             }
         }
 
-        val fixedCount = filteredSchedules.count { it.eventType == "fixed" }
-        val healthCount = filteredSchedules.count {
-            it.eventType == "health" || it.eventType == "health_intervention"
-        }
-        val flexibleCount = filteredSchedules.count { it.eventType == "flexible" }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).background(IceBlue, CircleShape))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("固定 $fixedCount", fontSize = 11.sp, color = TextSecondary)
+        ScheduleLegend(
+            fixedCount = filteredSchedules.count { it.eventType == "fixed" },
+            flexibleCount = filteredSchedules.count { it.eventType == "flexible" },
+            healthCount = filteredSchedules.count {
+                it.eventType == "health" || it.eventType == "health_intervention"
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).background(SkyBlue, CircleShape))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("弹性 $flexibleCount", fontSize = 11.sp, color = TextSecondary)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).background(MintGreen, CircleShape))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("健康干预 $healthCount", fontSize = 11.sp, color = TextSecondary)
-            }
-        }
+        )
 
         when {
             uiState.isLoading -> {
@@ -130,64 +113,63 @@ fun ScheduleScreen(
                 }
             }
             uiState.error != null -> {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, GlassBorder, RoundedCornerShape(24.dp)),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Surface.copy(alpha = 0.6f)
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(Dimens.padScreen),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(uiState.error ?: "加载失败", color = RoseRed)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = { viewModel.loadSchedules(userId) },
-                            colors = ButtonDefaults.buttonColors(containerColor = IceBlue)
+                    GlassCard(accent = RoseRed) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("重试", color = TextDark)
+                            Text(uiState.error ?: "加载失败", color = RoseRed)
+                            Spacer(modifier = Modifier.height(Dimens.spaceSm))
+                            Button(
+                                onClick = { viewModel.loadSchedules(userId) },
+                                colors = ButtonDefaults.buttonColors(containerColor = IceBlue)
+                            ) {
+                                Text("重试", color = TextDark)
+                            }
                         }
                     }
                 }
             }
             filteredSchedules.isEmpty() -> {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, GlassBorder, RoundedCornerShape(24.dp)),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Surface.copy(alpha = 0.6f)
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(Dimens.padScreen),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.EventAvailable,
-                            contentDescription = null,
-                            tint = TextDim,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("今天没有日程安排", color = TextPrimary, fontSize = 15.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("享受自由时光", color = TextDim, fontSize = 13.sp)
+                    GlassCard {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.EventAvailable,
+                                contentDescription = null,
+                                tint = TextTertiary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(Dimens.spaceMd))
+                            Text("今天没有日程安排", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(Dimens.spaceXs))
+                            Text("享受自由时光", color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
             else -> {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = Dimens.padScreen,
+                        end = Dimens.padScreen,
+                        bottom = Dimens.space2Xl
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)
                 ) {
                     items(filteredSchedules, key = { it.id }) { schedule ->
-                        TimelineEventCard(
+                        TimelineEventItem(
                             schedule = schedule,
                             onDelete = { viewModel.deleteSchedule(schedule.id) }
                         )
@@ -209,6 +191,33 @@ fun ScheduleScreen(
 }
 
 @Composable
+private fun ScheduleLegend(
+    fixedCount: Int,
+    flexibleCount: Int,
+    healthCount: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimens.padScreen, vertical = Dimens.spaceSm),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg)
+    ) {
+        LegendItem(color = IceBlue, label = "固定 $fixedCount")
+        LegendItem(color = MintGreen, label = "弹性 $flexibleCount")
+        LegendItem(color = RoseRed, label = "健康 $healthCount")
+    }
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+    }
+}
+
+@Composable
 private fun DaySwiper(
     activeDate: LocalDate,
     onDateChange: (LocalDate) -> Unit
@@ -223,7 +232,7 @@ private fun DaySwiper(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(horizontal = Dimens.padScreen, vertical = Dimens.spaceXs),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -235,7 +244,7 @@ private fun DaySwiper(
             val textColor = when {
                 isActive -> TextDark
                 isToday -> IceBlue
-                else -> TextDim
+                else -> TextTertiary
             }
 
             Column(
@@ -248,13 +257,13 @@ private fun DaySwiper(
             ) {
                 Text(
                     text = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
-                    fontSize = 11.sp,
+                    style = MaterialTheme.typography.labelSmall,
                     color = textColor
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "${day.dayOfMonth}",
-                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = textColor
                 )
@@ -263,42 +272,15 @@ private fun DaySwiper(
     }
 }
 
-private data class EventTypeConfig(
-    val label: String,
-    val color: Color,
-    val bgColor: Color
-)
-
-private fun getEventTypeConfig(eventType: String): EventTypeConfig {
-    return when (eventType) {
-        "fixed" -> EventTypeConfig(
-            label = "固定",
-            color = IceBlue,
-            bgColor = IceBlue.copy(alpha = 0.08f)
-        )
-        "health", "health_intervention" -> EventTypeConfig(
-            label = "健康干预",
-            color = MintGreen,
-            bgColor = MintGreen.copy(alpha = 0.08f)
-        )
-        else -> EventTypeConfig(
-            label = "弹性",
-            color = SkyBlue,
-            bgColor = SkyBlue.copy(alpha = 0.08f)
-        )
-    }
-}
-
 @Composable
-private fun TimelineEventCard(
+private fun TimelineEventItem(
     schedule: Schedule,
     onDelete: () -> Unit
 ) {
     val config = getEventTypeConfig(schedule.eventType)
+    val timeRange = "${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}"
 
-    Row(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Row(modifier = Modifier.fillMaxWidth()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.width(32.dp)
@@ -306,71 +288,37 @@ private fun TimelineEventCard(
             Box(
                 modifier = Modifier
                     .size(15.dp)
-                    .background(config.bgColor, CircleShape)
+                    .background(config.color.copy(alpha = 0.15f), CircleShape)
                     .border(2.dp, config.color, CircleShape)
             )
             Box(
                 modifier = Modifier
                     .width(1.dp)
-                    .weight(1f)
+                    .height(40.dp)
                     .background(Color.White.copy(alpha = 0.06f))
             )
         }
 
-        Surface(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 8.dp, top = 0.dp, bottom = 8.dp)
-                .border(1.dp, config.color.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            color = config.bgColor
-        ) {
-            Row(
+        Box(modifier = Modifier.weight(1f)) {
+            EventCard(
+                title = schedule.title,
+                timeRange = timeRange,
+                description = "",
+                type = schedule.eventType
+            )
+            IconButton(
+                onClick = onDelete,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                    .align(Alignment.TopEnd)
+                    .size(28.dp)
+                    .padding(top = Dimens.spaceMd, end = Dimens.spaceMd)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = schedule.title,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = config.color.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = config.label,
-                                fontSize = 10.sp,
-                                color = config.color,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}",
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "删除",
-                        tint = TextDim,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "删除",
+                    tint = TextTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -389,9 +337,9 @@ fun AddScheduleDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加日程", color = TextPrimary) },
-        containerColor = Surface,
+        containerColor = Bg1,
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -400,34 +348,43 @@ fun AddScheduleDialog(
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = IceBlue,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = IceBlue
+                        unfocusedBorderColor = GlassBorder,
+                        focusedLabelColor = IceBlue,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = IceBlue
                     )
                 )
                 OutlinedTextField(
                     value = startTime,
                     onValueChange = { startTime = it },
                     label = { Text("开始时间 (ISO格式)") },
-                    placeholder = { Text("2025-01-15T09:00:00Z") },
+                    placeholder = { Text("2026-01-15T09:00:00Z") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = IceBlue,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = IceBlue
+                        unfocusedBorderColor = GlassBorder,
+                        focusedLabelColor = IceBlue,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = IceBlue
                     )
                 )
                 OutlinedTextField(
                     value = endTime,
                     onValueChange = { endTime = it },
                     label = { Text("结束时间 (ISO格式)") },
-                    placeholder = { Text("2025-01-15T10:00:00Z") },
+                    placeholder = { Text("2026-01-15T10:00:00Z") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = IceBlue,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = IceBlue
+                        unfocusedBorderColor = GlassBorder,
+                        focusedLabelColor = IceBlue,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = IceBlue
                     )
                 )
             }
@@ -443,7 +400,7 @@ fun AddScheduleDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = TextSecondary)
+                Text("取消", color = TextTertiary)
             }
         }
     )

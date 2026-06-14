@@ -24,6 +24,7 @@ class MetricType(str, enum.Enum):
     sleep_stage = "sleep_stage"        # 睡眠阶段
     heart_rate = "heart_rate"          # 心率
     hrv = "hrv"                        # 心率变异性
+    spo2 = "spo2"                      # 血氧饱和度
 
 
 class EventType(str, enum.Enum):

@@ -24,6 +24,9 @@ data class HealthUiState(
     val cardioLevel: String? = null,
     val cardioRisk: String? = null,
     val hrv: String? = null,
+    val spo2: Int? = null,
+    val steps: Int? = null,
+    val statusText: String = "等待数据",
     val recentMetrics: List<HealthMetric> = emptyList(),
     val lastUpdateTime: Long = 0L,
     val isSseConnected: Boolean = false
@@ -60,6 +63,9 @@ class HealthViewModel @Inject constructor(
                                 cardioLevel = parseCardioLevel(metrics["cardio_index"]?.value),
                                 cardioRisk = parseCardioRisk(metrics["cardio_index"]?.value),
                                 hrv = parseHrv(metrics["hrv"]?.value),
+                                spo2 = parseSpo2(metrics["spo2"]?.value),
+                                steps = parseSteps(metrics["steps"]?.value),
+                                statusText = parseCardioLevel(metrics["cardio_index"]?.value) ?: "等待数据",
                                 recentMetrics = metrics.values.toList(),
                                 lastUpdateTime = System.currentTimeMillis(),
                                 error = null
@@ -200,6 +206,22 @@ class HealthViewModel @Inject constructor(
             if (value is Map<*, *>) {
                 (value as Map<*, *>)["rmssd"]?.toString()?.let { "${it} ms" }
             } else null
+        } catch (e: Exception) { null }
+    }
+
+    private fun parseSpo2(value: Any?): Int? {
+        return try {
+            if (value is Number) value.toInt()
+            else if (value is Map<*, *>) (value as Map<*, *>)["spo2"]?.toString()?.toIntOrNull()
+            else value?.toString()?.toIntOrNull()
+        } catch (e: Exception) { null }
+    }
+
+    private fun parseSteps(value: Any?): Int? {
+        return try {
+            if (value is Number) value.toInt()
+            else if (value is Map<*, *>) (value as Map<*, *>)["count"]?.toString()?.toIntOrNull()
+            else value?.toString()?.toIntOrNull()
         } catch (e: Exception) { null }
     }
 

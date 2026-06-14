@@ -3,12 +3,13 @@ package com.vitasleep.android.ui.screens.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,21 +19,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vitasleep.android.ui.components.GlassCard
+import com.vitasleep.android.ui.components.OverviewBar
+import com.vitasleep.android.ui.components.TypewriterText
 import com.vitasleep.android.ui.theme.*
 import com.vitasleep.android.veepoo.VeepooManager
 
 @Composable
 fun ChatScreen(
+    onNavigateToHealth: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val userId = VeepooManager.DEFAULT_USER_ID
-    var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     LaunchedEffect(userId) {
         try {
             viewModel.loadHistory(userId)
+            viewModel.loadOverview(userId)
         } catch (e: Exception) {
         }
     }
@@ -46,194 +51,186 @@ fun ChatScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(DeepBg)
     ) {
-        // 标题
-        Text(
-            text = "健康助手",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = OnBackground
+        OverviewBar(
+            batteryPercentage = uiState.battery,
+            statusText = uiState.statusText,
+            metricsSummary = uiState.metricsSummary,
+            onClick = onNavigateToHealth
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "基于 GLM-4 大模型，帮你分析健康数据、制定作息计划",
-            fontSize = 12.sp,
-            color = OnSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
 
-        // 消息列表
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Surface),
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .padding(horizontal = Dimens.padScreen),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+            contentPadding = PaddingValues(vertical = Dimens.spaceMd)
         ) {
             if (uiState.isLoading && uiState.messages.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Primary)
+                item {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("助手正在思考…", color = TextTertiary, fontSize = 12.sp)
+                    }
                 }
+            } else if (uiState.messages.isEmpty()) {
+                item { WelcomeMessage() }
             } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (uiState.messages.isEmpty()) {
-                        item {
-                            WelcomeMessage()
-                        }
-                    }
-                    items(uiState.messages) { message ->
-                        ChatBubble(
-                            role = message.role,
-                            content = message.content,
-                            isLoading = false
-                        )
-                    }
-                    if (uiState.isLoading && uiState.messages.isNotEmpty()) {
-                        item {
-                            ChatBubble(role = "assistant", content = "", isLoading = true)
-                        }
+                itemsIndexed(uiState.messages) { index, message ->
+                    val isLast = index == uiState.messages.lastIndex
+                    ChatBubble(
+                        role = message.role ?: "user",
+                        content = message.content ?: "",
+                        useTypewriter = (message.role == "assistant") && isLast && !uiState.isLoading
+                    )
+                }
+                if (uiState.isLoading) {
+                    item {
+                        Text("助手正在思考…", color = TextTertiary, fontSize = 12.sp, modifier = Modifier.padding(start = Dimens.spaceMd))
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 输入框
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = { Text("询问健康建议…") },
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Primary,
-                    unfocusedBorderColor = SurfaceVariant,
-                    focusedContainerColor = Surface,
-                    unfocusedContainerColor = Surface
-                ),
-                shape = RoundedCornerShape(24.dp),
-                maxLines = 3
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = {
-                    if (inputText.isNotBlank() && !uiState.isLoading) {
-                        viewModel.sendMessage(userId, inputText)
-                        inputText = ""
-                    }
-                },
-                enabled = inputText.isNotBlank() && !uiState.isLoading,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(if (inputText.isNotBlank()) Primary else SurfaceVariant)
-            ) {
-                Icon(
-                    Icons.Default.Send,
-                    contentDescription = "发送",
-                    tint = OnPrimary
-                )
-            }
-        }
+        ChatInputBar(
+            text = uiState.inputText,
+            onTextChange = { viewModel.onInputTextChanged(it) },
+            onSend = {
+                if (uiState.inputText.isNotBlank() && !uiState.isLoading) {
+                    viewModel.sendMessage(userId, uiState.inputText)
+                }
+            },
+            enabled = !uiState.isLoading
+        )
     }
 }
 
 @Composable
-fun WelcomeMessage() {
+private fun WelcomeMessage() {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Dimens.spaceXl))
         Icon(
             Icons.Default.SmartToy,
             contentDescription = null,
-            tint = Primary,
+            tint = IceBlue,
             modifier = Modifier.size(48.dp)
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Dimens.spaceMd))
         Text(
             "你好！我是 VitaSleep 健康助手",
             fontWeight = FontWeight.Medium,
-            color = OnSurface
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleMedium
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "你可以问我：\n" +
-                    "• 昨晚睡眠质量如何？\n" +
-                    "• 今天身体电量怎么样？\n" +
-                    "• 建议一个适合我的作息计划",
-            color = OnSurfaceVariant,
-            fontSize = 13.sp,
-            lineHeight = 20.sp
-        )
+        Spacer(modifier = Modifier.height(Dimens.spaceXs))
+        GlassCard {
+            Text(
+                "你可以问我：\n• 昨晚睡眠质量如何？\n• 今天身体电量怎么样？\n• 建议一个适合我的作息计划",
+                color = TextTertiary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }
 
 @Composable
-fun ChatBubble(
+private fun ChatBubble(
     role: String,
     content: String,
-    isLoading: Boolean
+    useTypewriter: Boolean
 ) {
     val isUser = role == "user"
-    val bgColor = if (isUser) Primary else SurfaceVariant
     val alignment = if (isUser) Alignment.End else Alignment.Start
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
-        if (isLoading) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = OnSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("助手正在思考…", color = OnSurfaceVariant, fontSize = 12.sp)
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomStart = if (isUser) 16.dp else 4.dp,
-                            bottomEnd = if (isUser) 4.dp else 16.dp
-                        )
+        Box(
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (isUser) 18.dp else 4.dp,
+                        bottomEnd = if (isUser) 4.dp else 18.dp
                     )
-                    .background(bgColor)
-                    .padding(12.dp)
-                    .widthIn(max = 280.dp)
-            ) {
+                )
+                .background(if (isUser) IceBlue else GlassBg)
+                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm)
+        ) {
+            if (useTypewriter && content.isNotEmpty()) {
+                TypewriterText(
+                    fullText = content,
+                    modifier = Modifier.padding(0.dp)
+                )
+            } else {
                 Text(
                     content,
-                    color = if (isUser) OnPrimary else OnSurface,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    color = if (isUser) TextDark else TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
-            Text(
-                if (isUser) "你" else "助手",
-                fontSize = 10.sp,
-                color = OnSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+        }
+        Text(
+            if (isUser) "你" else "助手",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextTertiary,
+            modifier = Modifier.padding(horizontal = Dimens.spaceXs, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChatInputBar(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSend: () -> Unit,
+    enabled: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Dimens.padScreen),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = onTextChange,
+            placeholder = { Text("询问健康建议…") },
+            modifier = Modifier.weight(1f),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = IceBlue,
+                unfocusedBorderColor = GlassBorder,
+                focusedContainerColor = GlassBg,
+                unfocusedContainerColor = GlassBg,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                cursorColor = IceBlue
+            ),
+            shape = RoundedCornerShape(24.dp),
+            maxLines = 3,
+            enabled = enabled
+        )
+        Spacer(modifier = Modifier.width(Dimens.spaceSm))
+        IconButton(
+            onClick = onSend,
+            enabled = enabled && text.isNotBlank(),
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(if (text.isNotBlank() && enabled) IceBlue else GlassBorder)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.Send,
+                contentDescription = "发送",
+                tint = TextDark
             )
         }
     }

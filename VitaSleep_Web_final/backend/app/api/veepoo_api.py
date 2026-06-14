@@ -25,13 +25,20 @@ async def upload_origin5min(req: VeepooOriginDataRequest, db: AsyncSession = Dep
     for i, rec in enumerate(req.records):
         try:
             computed_at = rec.timestamp
-            hr_value = {"bpm": rec.heart_rate, "source": "veepoo", "device_id": req.device_id}
-            metric_hr = await ingest_metric(db, req.user_id, MetricType.heart_rate, hr_value, computed_at)
-            all_metric_ids.append(metric_hr.id)
+            if rec.heart_rate is not None:
+                hr_value = {"bpm": rec.heart_rate, "source": "veepoo", "device_id": req.device_id}
+                metric_hr = await ingest_metric(db, req.user_id, MetricType.heart_rate, hr_value, computed_at)
+                all_metric_ids.append(metric_hr.id)
 
-            bp_value = {"systolic": rec.systolic, "diastolic": rec.diastolic, "source": "veepoo"}
-            metric_bp = await ingest_metric(db, req.user_id, MetricType.blood_pressure, bp_value, computed_at)
-            all_metric_ids.append(metric_bp.id)
+            if rec.systolic is not None and rec.diastolic is not None:
+                bp_value = {"systolic": rec.systolic, "diastolic": rec.diastolic, "source": "veepoo"}
+                metric_bp = await ingest_metric(db, req.user_id, MetricType.blood_pressure, bp_value, computed_at)
+                all_metric_ids.append(metric_bp.id)
+
+            if rec.spo2 is not None:
+                spo2_value = {"spo2": rec.spo2, "source": "veepoo", "device_id": req.device_id}
+                metric_spo2 = await ingest_metric(db, req.user_id, MetricType.spo2, spo2_value, computed_at)
+                all_metric_ids.append(metric_spo2.id)
         except Exception as e:
             errors.append(f"第{i+1}条失败: {str(e)}")
 

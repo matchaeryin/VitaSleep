@@ -46,3 +46,13 @@ val TextPrimary = Color(0xFFF1F5F9)
 val TextSecondary = Color(0xFF94A3B8)
 val TextDim = Color(0xFF64748B)
 val TextDark = Color(0xFF0A0D13)
+
+val Bg0 = Color(0xFF0D0F14)
+val Bg1 = Color(0xFF161922)
+val Bg2 = Color(0xFF1E222D)
+
+val GlassBorderStrong = Color(0x29FFFFFF)
+
+val TextTertiary = Color(0xFF94A3B8)
+val TextQuaternary = Color(0xFF64748B)
+val TextDisabled = Color(0xFF475569)
