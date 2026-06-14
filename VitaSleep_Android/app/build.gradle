@@ -14,8 +14,8 @@ android {
         applicationId "com.vitasleep.android"
         minSdk 26
         targetSdk 34
-        versionCode 15
-        versionName "1.0.15"
+        versionCode 17
+        versionName "1.0.17"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -68,21 +68,20 @@ android {
 dependencies {
     implementation fileTree(include: ['*.aar', '*.jar'], exclude: ['gson-*.jar'], dir: 'libs')
 
-    // Veepoo SDK (vpprotocol) requires the Nordic/Juul mcumgr-android library
-    // (io.runtime.mcumgr) at runtime for its McuMgrOtaManager, otherwise
-    // NoClassDefFoundError: io/runtime/mcumgr/ble/McuMgrBleTransport on connect.
-    implementation 'com.github.runtimeco.mcumgr-android:mcumgr-ble:0.11.0'
-    implementation 'com.github.runtimeco.mcumgr-android:mcumgr-core:0.11.0'
-
-    // mcumgr-ble 0.11.0 (from JitPack) ships a POM WITHOUT its own runtime
-    // dependencies (JitPack dropped them), so they must be declared here.
-    // Versions pinned to exactly what mcumgr-ble 0.11.0 was compiled against
-    // (see mcumgr-android/mcumgr-ble/build.gradle) to avoid NoSuchMethodError.
-    //   - no.nordicsemi.android:ble  -> McuMgrBleTransport extends BleManager.
-    //     Without it: NoClassDefFoundError: no/nordicsemi/android/ble/BleManager.
-    //   - slf4j-api -> mcumgr logs via org.slf4j.Logger at runtime.
-    implementation 'no.nordicsemi.android:ble:2.2.3'
-    implementation 'org.slf4j:slf4j-api:1.7.30'
+    // Veepoo SDK vpprotocol-2.3.68.15 was compiled against the **Nordic**
+    // mcumgr library (no.nordicsemi.android:mcumgr-*), NOT the runtimeco
+    // JitPack fork. The Nordic fork keeps FirmwareUpgradeManager under the
+    // io.runtime.mcumgr.dfu.mcuboot subpackage; the runtimeco 0.11.0 fork
+    // moved it to io.runtime.mcumgr.dfu, which caused:
+    //   NoClassDefFoundError: io/runtime/mcumgr/dfu/mcuboot/FirmwareUpgradeManager
+    // These three Nordic deps are the ones declared by Veepoo's official demo
+    // (HBandSDK/Android_Ble_SDK). Nordic's POM is complete, so ble/slf4j/etc.
+    // are pulled transitively (no manual ble/slf4j needed).
+    implementation 'no.nordicsemi.android:mcumgr-core:2.7.4'
+    implementation 'no.nordicsemi.android:mcumgr-ble:2.7.4'
+    implementation 'no.nordicsemi.android.support.v18:scanner:1.4.2'
+    // Veepoo SDK uses LocalBroadcastManager for inter-component BLE events.
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
 
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'androidx.core:core-ktx:1.12.0'
