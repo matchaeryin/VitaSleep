@@ -62,10 +62,10 @@ data class VeepooOriginDataRequest(
 
 data class VeepooOriginRecord(
     @SerializedName("timestamp") val timestamp: String = "",
-    @SerializedName("heart_rate") val heartRate: Int = 0,
+    @SerializedName("heart_rate") val heartRate: Int? = null,
     @SerializedName("heart_rate_array") val heartRateArray: List<Int>? = null,
-    @SerializedName("systolic") val systolic: Int = 0,
-    @SerializedName("diastolic") val diastolic: Int = 0,
+    @SerializedName("systolic") val systolic: Int? = null,
+    @SerializedName("diastolic") val diastolic: Int? = null,
     @SerializedName("steps") val steps: Int = 0,
     @SerializedName("spo2") val spo2: Int? = null
 )

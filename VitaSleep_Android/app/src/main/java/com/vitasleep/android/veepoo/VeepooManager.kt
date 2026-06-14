@@ -204,7 +204,7 @@ class VeepooManager private constructor(
                         } else {
                             Log.e(TAG, "connectState: FAILED code=$code")
                             stopRealtimeLogcat()
-                            _connectionState.value = ConnectionState.Error("连接失败 (code=$code)")
+                            _connectionState.value = ConnectionState.Error("???? (code=$code)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "IConnectResponse.connectState error", e)
@@ -222,13 +222,13 @@ class VeepooManager private constructor(
                             Log.e(TAG, "notifyState: FAILED state=$state")
                             stopRealtimeLogcat()
                             VeepooService.stop(context)
-                            _connectionState.value = ConnectionState.Error("通知服务注册失败 (state=$state)")
+                            _connectionState.value = ConnectionState.Error("???????? (state=$state)")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "INotifyResponse.notifyState error", e)
                         stopRealtimeLogcat()
                         VeepooService.stop(context)
-                        _connectionState.value = ConnectionState.Error("通知服务异常: ${e.javaClass.simpleName}: ${e.message}")
+                        _connectionState.value = ConnectionState.Error("??????: ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             })
@@ -236,7 +236,7 @@ class VeepooManager private constructor(
         } catch (e: Throwable) {
             Log.e(TAG, "connectDevice FAILED", e)
             stopRealtimeLogcat()
-            _connectionState.value = ConnectionState.Error("连接异常: ${e.javaClass.simpleName}: ${e.message}")
+            _connectionState.value = ConnectionState.Error("????: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -258,7 +258,7 @@ class VeepooManager private constructor(
                         try {
                             stopRealtimeLogcat()
                             VeepooService.stop(context)
-                            _connectionState.value = ConnectionState.Error("密码确认超时")
+                            _connectionState.value = ConnectionState.Error("??????")
                         } catch (e: Throwable) {
                             Log.e(TAG, "onConnectionConfirmTimeout error", e)
                         }
@@ -319,7 +319,7 @@ class VeepooManager private constructor(
             Log.e(TAG, "confirmDevicePwd FAILED", e)
             stopRealtimeLogcat()
             VeepooService.stop(context)
-            _connectionState.value = ConnectionState.Error("密码确认异常: ${e.javaClass.simpleName}: ${e.message}")
+            _connectionState.value = ConnectionState.Error("??????: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -493,9 +493,9 @@ class VeepooManager private constructor(
             try {
                 VeepooOriginRecord(
                     timestamp = record["timestamp"] as? String ?: return@mapNotNull null,
-                    heartRate = (record["heart_rate"] as? Number)?.toInt() ?: 0,
-                    systolic = (record["systolic"] as? Number)?.toInt() ?: 120,
-                    diastolic = (record["diastolic"] as? Number)?.toInt() ?: 80,
+                    heartRate = (record["heart_rate"] as? Number)?.toInt()?.takeIf { it > 0 },
+                    systolic = (record["systolic"] as? Number)?.toInt()?.takeIf { it > 0 },
+                    diastolic = (record["diastolic"] as? Number)?.toInt()?.takeIf { it > 0 },
                     steps = (record["steps"] as? Number)?.toInt() ?: 0
                 )
             } catch (e: Throwable) {
